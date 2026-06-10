@@ -1,0 +1,26 @@
+{
+  "name": "flowdiff",
+  "version": "0.1.0",
+  "description": "Call-graph diffs for code review — see what changed structurally, not just textually",
+  "type": "module",
+  "bin": {
+    "flowdiff": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "typescript": "^5.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
