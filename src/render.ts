@@ -25,14 +25,14 @@ function ref(id: string, homeFile: string, graph: Graph): string {
   return file && file !== homeFile ? `${name}${line} ${dim(`(${file})`)}` : name + line;
 }
 
-interface EdgeChanges {
+export interface EdgeChanges {
   addedByFrom: Map<string, Edge[]>;
   removedByFrom: Map<string, Edge[]>;
   addedByTo: Map<string, Edge[]>;
   removedByTo: Map<string, Edge[]>;
 }
 
-function groupEdges(diff: GraphDiff): EdgeChanges {
+export function groupEdges(diff: GraphDiff): EdgeChanges {
   const group = (edges: Edge[], key: (e: Edge) => string) => {
     const m = new Map<string, Edge[]>();
     for (const e of edges) {
@@ -51,7 +51,52 @@ function groupEdges(diff: GraphDiff): EdgeChanges {
   };
 }
 
-function renderFnBlock(
+export interface ChangeEntry {
+  fn: FnInfo;
+  before: FnInfo | null;
+  after: FnInfo | null;
+  kind: "added" | "renamed" | "modified" | "removed";
+  marker: string;
+  title?: string;
+}
+
+/** Every changed function as a flat card list: by file, then kind, then line. */
+export function changedEntries(diff: GraphDiff): ChangeEntry[] {
+  const entries: ChangeEntry[] = [];
+  for (const fn of diff.added) {
+    entries.push({ fn, before: null, after: fn, kind: "added", marker: green("+") });
+  }
+  for (const r of diff.renamed) {
+    const from =
+      r.before.file === r.after.file
+        ? bold(r.before.name)
+        : `${bold(r.before.name)} ${dim(`(${r.before.file})`)}`;
+    entries.push({
+      fn: r.after,
+      before: r.before,
+      after: r.after,
+      kind: "renamed",
+      marker: cyan("→"),
+      title: `${from} ${cyan("→")} ${bold(r.after.name)}`,
+    });
+  }
+  for (const m of diff.modified) {
+    entries.push({ fn: m.after, before: m.before, after: m.after, kind: "modified", marker: yellow("~") });
+  }
+  for (const fn of diff.removed) {
+    entries.push({ fn, before: fn, after: null, kind: "removed", marker: red("−") });
+  }
+  const order = { added: 0, renamed: 1, modified: 2, removed: 3 };
+  entries.sort(
+    (a, b) =>
+      a.fn.file.localeCompare(b.fn.file) ||
+      order[a.kind] - order[b.kind] ||
+      a.fn.line - b.fn.line,
+  );
+  return entries;
+}
+
+export function renderFnBlock(
   out: string[],
   fn: FnInfo,
   marker: string,
@@ -130,7 +175,7 @@ export function renderDiff(
       `      ${dim("call edges")}  ${green(`+${diff.addedEdges.length}`)}  ${red(`−${diff.removedEdges.length}`)}`,
   );
   out.push(
-    `${INDENT}${dim("+ added   − removed   ~ body changed   → renamed/moved")}`,
+    `${INDENT}${green("+ added")}   ${red("− removed")}   ${yellow("~ body changed")}   ${cyan("→ renamed/moved")}   ${dim("external = calls leaving this repo")}`,
   );
   out.push("");
 
@@ -145,35 +190,15 @@ export function renderDiff(
     return out.join("\n");
   }
 
-  // Group every changed function by file, preserving the change kind.
-  type Entry = { fn: FnInfo; marker: string; order: number; title?: string };
-  const byFile = new Map<string, Entry[]>();
-  const put = (fn: FnInfo, marker: string, order: number, title?: string) => {
-    const arr = byFile.get(fn.file);
-    const entry = { fn, marker, order, title };
-    if (arr) arr.push(entry);
-    else byFile.set(fn.file, [entry]);
-  };
-  for (const fn of diff.added) put(fn, green("+"), 0);
-  for (const r of diff.renamed) {
-    const from =
-      r.before.file === r.after.file
-        ? bold(r.before.name)
-        : `${bold(r.before.name)} ${dim(`(${r.before.file})`)}`;
-    put(r.after, cyan("→"), 1, `${from} ${cyan("→")} ${bold(r.after.name)}`);
-  }
-  for (const m of diff.modified) put(m.after, yellow("~"), 2);
-  for (const fn of diff.removed) put(fn, red("−"), 3);
-
   const consumed = new Set<string>();
-  for (const file of [...byFile.keys()].sort()) {
-    out.push(bold(file));
-    out.push("");
-    const entries = byFile.get(file)!;
-    entries.sort((a, b) => a.order - b.order || a.fn.line - b.fn.line);
-    for (const { fn, marker, title } of entries) {
-      renderFnBlock(out, fn, marker, base, head, ch, consumed, title);
+  let lastFile = "";
+  for (const e of changedEntries(diff)) {
+    if (e.fn.file !== lastFile) {
+      out.push(bold(e.fn.file));
+      out.push("");
+      lastFile = e.fn.file;
     }
+    renderFnBlock(out, e.fn, e.marker, base, head, ch, consumed, e.title);
   }
 
   // Edge changes whose source function body didn't change (e.g. a call that

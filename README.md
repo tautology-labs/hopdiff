@@ -40,8 +40,11 @@ flowdiff                    # HEAD vs working tree — run it right after your a
 flowdiff main               # main vs working tree
 flowdiff main..feature      # any two revisions
 flowdiff fn processRefund   # before/after diff of one function
+flowdiff -i                 # interactive: navigate the graph, expand diffs, edit
 flowdiff --json             # structured output — scripts, or context for an AI reviewer
 ```
+
+Interactive mode (`-i`) turns the cards into a browser: `↑`/`↓` move between functions, `enter` expands a function's diff inline, `tab` picks a caller/callee to jump to, and `e` opens `$EDITOR` at that exact function — when you return, the working tree is re-scanned and the graph diff updates around your edit. Press `?` for keys and the marker legend. The edit-while-seeing-callers loop is a deliberate revival of the Smalltalk System Browser (1980), which treated the function-in-its-graph, not the file, as the unit of editing.
 
 Run it from anywhere inside a git repo. `+` added, `−` removed, `~` body changed, `→` renamed/moved. The `calls` row is flow within your repo; the `external` row is calls that leave it (imports, stdlib) — a `+` there means the change took on a new outside dependency.
 
@@ -68,5 +71,5 @@ Name-based call resolution is a deliberate v0 heuristic: it's wrong in the ways 
 - Branch-level deltas (new `if`/`switch` arms inside a changed function)
 - Rename detection for *edited* renames (exact-body renames are detected; renamed-and-changed still shows as remove + add)
 - Other languages (the extractor is one ~100-line file; tree-sitter would generalize it)
-- Interactive TUI navigation (arrow keys through the graph, expanding diffs inline)
 - A GitHub Action that posts the flow summary as a PR comment
+- Differential tracing: run the test suite at both revisions under instrumentation and diff the *runtime* call patterns — catch the change that makes an input loop forever or allocate unboundedly

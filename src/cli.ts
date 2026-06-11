@@ -2,6 +2,7 @@
 import { listSourceFiles, readFileAt, repoRoot, resolveRef, WORKTREE } from "./git.js";
 import { buildGraph, diffGraphs, type Graph } from "./graph.js";
 import { renderDiff, renderFnDiff } from "./render.js";
+import { runTui } from "./tui.js";
 import type { FnInfo } from "./extract.js";
 
 const HELP = `flowdiff — call-graph diffs for code review
@@ -14,6 +15,7 @@ Usage:
   flowdiff fn <name> [revs]    show one function's before/after diff
 
 Flags:
+  -i        interactive mode — navigate the graph, expand diffs, e to edit
   --json    machine-readable output (for scripts, or for feeding an AI)
   --help    this text
 `;
@@ -50,7 +52,8 @@ function findFn(graph: Graph, name: string): FnInfo[] {
 function main(): void {
   const argv = process.argv.slice(2);
   const json = argv.includes("--json");
-  const args = argv.filter((a) => !a.startsWith("--"));
+  const interactive = argv.includes("-i") || argv.includes("--interactive");
+  const args = argv.filter((a) => !a.startsWith("-"));
 
   if (argv.includes("--help") || argv.includes("-h")) {
     process.stdout.write(HELP);
@@ -102,6 +105,23 @@ function main(): void {
       }
     }
     process.stdout.write(renderFnDiff(fnName, befores[0] ?? null, afters[0] ?? null));
+    return;
+  }
+
+  if (interactive) {
+    if (!process.stdout.isTTY || !process.stdin.isTTY) {
+      process.stderr.write("flowdiff: -i needs an interactive terminal\n");
+      process.exit(1);
+    }
+    runTui({
+      cwd,
+      baseLabel: label(base),
+      headLabel: label(head),
+      baseGraph,
+      initialHead: headGraph,
+      loadHead: () => loadGraph(headRef, cwd),
+      headIsWorktree: headRef === WORKTREE,
+    });
     return;
   }
 
