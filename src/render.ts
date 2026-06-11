@@ -1,6 +1,6 @@
 import type { FnInfo } from "./extract.js";
 import type { Edge, Graph, GraphDiff } from "./graph.js";
-import { bold, cyan, dim, green, magenta, red, yellow } from "./ansi.js";
+import { bold, cyan, dim, green, red, yellow } from "./ansi.js";
 import { diffLines } from "./linediff.js";
 
 const INDENT = "  ";
@@ -18,7 +18,7 @@ function fileOf(id: string): string | null {
 /** `name (other/file.ts)` — file shown only when it differs from `homeFile`. */
 function ref(id: string, homeFile: string, graph: Graph): string {
   const name = cyan(shortName(id));
-  if (id.startsWith("ext:")) return name + magenta("*");
+  if (id.startsWith("ext:")) return dim(shortName(id));
   const file = fileOf(id);
   const fn = graph.fns.get(id);
   const line = fn ? dim(`:${fn.line}`) : "";
@@ -67,6 +67,9 @@ function renderFnBlock(
   const isRemoved = marker.includes("−");
   const current = isRemoved ? base : head;
 
+  const row = (label: string, parts: string[]) =>
+    out.push(`${INDENT}${INDENT}${dim(label.padEnd(10))}${parts.join("  ")}`);
+
   // Callers: who reaches this function now (or did, if removed).
   const callers = current.callersOf.get(fn.id) ?? [];
   const newCallerIds = new Set((ch.addedByTo.get(fn.id) ?? []).map((e) => e.fromId));
@@ -80,26 +83,32 @@ function renderFnBlock(
     ...lostCallers.map((e) => red("−") + ref(e.fromId, fn.file, base)),
   ];
   if (callerParts.length > 0) {
-    out.push(`${INDENT}${INDENT}${dim("callers")}  ${callerParts.join("  ")}`);
+    row("callers", callerParts);
   } else if (!isRemoved) {
-    out.push(`${INDENT}${INDENT}${dim("callers")}  ${dim("none found (entry point?)")}`);
+    row("callers", [dim("none found (entry point?)")]);
   }
 
-  // Calls: where this function goes.
+  // Calls: where this function goes. In-repo edges are the flow; calls that
+  // leave the repo (imports, stdlib) get their own row instead of a symbol.
   const calls = [...current.edges.values()].filter((e) => e.fromId === fn.id);
   const newCallKeys = new Set((ch.addedByFrom.get(fn.id) ?? []).map((e) => e.toId));
   const lostCalls = isRemoved ? [] : (ch.removedByFrom.get(fn.id) ?? []);
-  const callParts = [
-    ...calls.map((e) =>
-      newCallKeys.has(e.toId)
-        ? green("+") + ref(e.toId, fn.file, current)
-        : ref(e.toId, fn.file, current),
-    ),
-    ...lostCalls.map((e) => red("−") + ref(e.toId, fn.file, base)),
+  const part = (e: Edge, graph: Graph, mark: string) =>
+    mark + ref(e.toId, fn.file, graph);
+  const inRepoParts = [
+    ...calls
+      .filter((e) => !e.external)
+      .map((e) => part(e, current, newCallKeys.has(e.toId) ? green("+") : "")),
+    ...lostCalls.filter((e) => !e.external).map((e) => part(e, base, red("−"))),
   ];
-  if (callParts.length > 0) {
-    out.push(`${INDENT}${INDENT}${dim("calls")}    ${callParts.join("  ")}`);
-  }
+  const externalParts = [
+    ...calls
+      .filter((e) => e.external)
+      .map((e) => part(e, current, newCallKeys.has(e.toId) ? green("+") : "")),
+    ...lostCalls.filter((e) => e.external).map((e) => part(e, base, red("−"))),
+  ];
+  if (inRepoParts.length > 0) row("calls", inRepoParts);
+  if (externalParts.length > 0) row("external", externalParts);
   out.push("");
 }
 
@@ -119,6 +128,9 @@ export function renderDiff(
   out.push(
     `${INDENT}${dim("functions")}   ${green(`+${diff.added.length}`)}  ${red(`−${diff.removed.length}`)}  ${yellow(`~${diff.modified.length}`)}  ${cyan(`→${diff.renamed.length}`)}` +
       `      ${dim("call edges")}  ${green(`+${diff.addedEdges.length}`)}  ${red(`−${diff.removedEdges.length}`)}`,
+  );
+  out.push(
+    `${INDENT}${dim("+ added   − removed   ~ body changed   → renamed/moved")}`,
   );
   out.push("");
 
@@ -156,6 +168,7 @@ export function renderDiff(
   const consumed = new Set<string>();
   for (const file of [...byFile.keys()].sort()) {
     out.push(bold(file));
+    out.push("");
     const entries = byFile.get(file)!;
     entries.sort((a, b) => a.order - b.order || a.fn.line - b.fn.line);
     for (const { fn, marker, title } of entries) {
@@ -183,7 +196,7 @@ export function renderDiff(
     out.push("");
   }
 
-  out.push(dim(`${INDENT}${magenta("*")} = not defined in this repo · flowdiff fn <name> shows a function's diff`));
+  out.push(dim(`${INDENT}flowdiff fn <name> shows a function's full diff`));
   out.push("");
   return out.join("\n");
 }

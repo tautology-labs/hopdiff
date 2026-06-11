@@ -7,24 +7,28 @@ This matters more than ever now that much of the code in a diff was written by a
 ```
 flowdiff HEAD → worktree
 
-  functions   +4  −1  ~2      call edges  +6  −1
+  functions   +4  −1  ~2  →0      call edges  +6  −1
+  + added   − removed   ~ body changed   → renamed/moved
 
 src/jobs.ts
+
   + retryFailedRefunds :3
-    callers  none found (entry point?)
-    calls    +processRefund:4 (src/payments.ts)
+    callers   none found (entry point?)
+    calls     +processRefund:4 (src/payments.ts)
 
 src/payments.ts
+
   + assessRisk :22
-    callers  +processRefund:4
-    calls    +flagForReview:28
+    callers   +processRefund:4
+    calls     +flagForReview:28
 
   ~ processRefund :4
-    callers  +retryFailedRefunds:3 (src/jobs.ts)  handleWebhook:3 (src/server.ts)
-    calls    loadOrder:14  validateAmount:18  +assessRisk:22  +auditLog*  +withRetry:32  refund*  −legacyCheck:20
+    callers   +retryFailedRefunds:3 (src/jobs.ts)  handleWebhook:3 (src/server.ts)
+    calls     loadOrder:14  validateAmount:18  +assessRisk:22  +withRetry:32  −legacyCheck:20
+    external  +auditLog  refund
 
   − legacyCheck :20
-    callers  processRefund:3
+    callers   processRefund:3
 ```
 
 One glance tells you the review story: there's a new entry point, `processRefund` gained a risk check, audit logging, and a retry wrapper, lost the legacy fraud heuristic, and is now reachable from a background job. That's the part of review you previously reconstructed in your head, one file at a time.
@@ -39,7 +43,7 @@ flowdiff fn processRefund   # before/after diff of one function
 flowdiff --json             # structured output — scripts, or context for an AI reviewer
 ```
 
-Run it from anywhere inside a git repo. `+` added, `−` removed, `~` body changed, `→` renamed/moved, `*` callee not defined in this repo.
+Run it from anywhere inside a git repo. `+` added, `−` removed, `~` body changed, `→` renamed/moved. The `calls` row is flow within your repo; the `external` row is calls that leave it (imports, stdlib) — a `+` there means the change took on a new outside dependency.
 
 ## Install
 
