@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { extractPythonFunctions, blankStringsAndComments } from "./extract-python.js";
+import { extractAny } from "./extractors.js";
 import { buildGraph } from "./graph.js";
 
 const PIPELINE = `
@@ -96,6 +97,20 @@ test("Python calls resolve to cross-file edges in the same graph", () => {
     { path: "svc.py", text: `def process(req):\n    return req\n` },
   ]);
   assert.ok(g.edges.has("api.py#handle -> svc.py#process"));
+});
+
+test("notebooks extract through the Python pipeline, magics blanked", () => {
+  const nb = JSON.stringify({
+    cells: [
+      { cell_type: "markdown", source: ["# def not_code():\n"] },
+      { cell_type: "code", source: ["%matplotlib inline\n", "def load(path):\n", "    return read_csv(path)\n"] },
+      { cell_type: "code", source: ["def train(df):\n", "    return fit(load(df))\n"] },
+    ],
+  });
+  const fns = extractAny("pipeline.ipynb", nb);
+  assert.deepEqual(fns.map((f: { name: string }) => f.name).sort(), ["load", "train"]);
+  const train = fns.find((f: { name: string }) => f.name === "train")!;
+  assert.deepEqual([...new Set(train.calls)].sort(), ["fit", "load"]);
 });
 
 test("blanking preserves offsets and newlines", () => {

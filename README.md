@@ -40,9 +40,22 @@ flowdiff                    # HEAD vs working tree — run it right after your a
 flowdiff main               # main vs working tree
 flowdiff main..feature      # any two revisions
 flowdiff fn processRefund   # before/after diff of one function
-flowdiff -i                 # interactive: navigate the graph, expand diffs, edit
+flowdiff blast handleRefund v1.42.0 v1.43.0
+                            # incident mode: which changed functions can touch
+                            # the symptom? call paths included
+flowdiff -i                 # interactive: navigate the graph, → browses callers,
+                            # enter expands diffs, e opens $EDITOR
+flowdiff roots              # locally-linked sibling services in the graph
 flowdiff --json             # structured output — scripts, or context for an AI reviewer
 ```
+
+Tab completion (subcommands, git refs, and live function names from the parsed graph) — add to `~/.zshrc`:
+
+```sh
+eval "$(flowdiff completions zsh)"
+```
+
+Unknown function names get did-you-mean suggestions; ambiguous ones (Java overloads, duplicates) list candidate `file#name` ids to pick from.
 
 Interactive mode (`-i`) turns the cards into a browser: `↑`/`↓` move between functions, `enter` expands a function's diff inline, `tab` picks a caller/callee to jump to, and `e` opens `$EDITOR` at that exact function — when you return, the working tree is re-scanned and the graph diff updates around your edit. Press `?` for keys and the marker legend. The edit-while-seeing-callers loop is a deliberate revival of the Smalltalk System Browser (1980), which treated the function-in-its-graph, not the file, as the unit of editing.
 
@@ -54,7 +67,7 @@ Run it from anywhere inside a git repo. `+` added, `−` removed, `~` body chang
 npm install && npm run build && npm link
 ```
 
-Node ≥ 18. **Languages: TypeScript, JavaScript, Java, and Python.** Two runtime dependencies, both pure JS, both parsers: the TypeScript compiler for TS/JS, and `java-parser` (Chevrotain) for Java; the Python extractor is hand-rolled (Python's `def`/indent structure makes that honest — strings and comments are blanked, brackets tracked, scopes close on dedent) with tree-sitter-via-WASM as the upgrade path if it needs to be production-grade. Adding a language means writing one extractor file answering "what's a function, what does it call"; everything else — graph, diff, rename detection, TUI, MCP tools — is language-agnostic. Python caveat: dynamic dispatch (`getattr`, exec, decorators that rewire) is invisible to any static graph, and untyped attribute calls make name-based resolution noisier than in TS/Java.
+Node ≥ 18. **Languages: TypeScript, JavaScript, Java, and Python — including Jupyter notebooks** (`.ipynb` code cells route through the Python extractor; magics and shell lines are skipped). Two runtime dependencies, both pure JS, both parsers: the TypeScript compiler for TS/JS, and `java-parser` (Chevrotain) for Java; the Python extractor is hand-rolled (Python's `def`/indent structure makes that honest — strings and comments are blanked, brackets tracked, scopes close on dedent) with tree-sitter-via-WASM as the upgrade path if it needs to be production-grade. Adding a language means writing one extractor file answering "what's a function, what does it call"; everything else — graph, diff, rename detection, TUI, MCP tools — is language-agnostic. Python caveat: dynamic dispatch (`getattr`, exec, decorators that rewire) is invisible to any static graph, and untyped attribute calls make name-based resolution noisier than in TS/Java.
 
 ## MCP — give the graph to your agent
 
