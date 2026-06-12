@@ -14,6 +14,8 @@ Usage:
   flowdiff <base>..<head>      same, range syntax
   flowdiff fn <name> [revs]    show one function's before/after diff
   flowdiff roots               list this repo's locally-linked sibling services
+  flowdiff completions zsh     print shell completions (add to ~/.zshrc:
+                               eval "$(flowdiff completions zsh)")
 
 Flags:
   -i        interactive mode — navigate the graph, expand diffs, e to edit
@@ -23,6 +25,46 @@ Flags:
 Languages: TypeScript, JavaScript, Java, Python.
 MCP server (callers/callees/flow_diff/blast_radius tools for AI agents):
   claude mcp add flowdiff -- node <path-to-flowdiff>/dist/mcp.js
+`;
+
+const ZSH_COMPLETIONS = `#compdef flowdiff
+__flowdiff_refs() {
+  local -a refs
+  refs=(HEAD \${(f)"$(git for-each-ref --format='%(refname:short)' refs/heads refs/tags 2>/dev/null)"})
+  compadd -a refs
+}
+__flowdiff_fns() {
+  local -a fns
+  fns=(\${(f)"$(flowdiff --list-fns 2>/dev/null)"})
+  compadd -a fns
+}
+_flowdiff() {
+  local curcontext="$curcontext" state line
+  _arguments -C \\
+    '(-i --interactive)'{-i,--interactive}'[interactive TUI]' \\
+    '--json[machine-readable output]' \\
+    '(-h --help)'{-h,--help}'[help]' \\
+    '1:command or ref:->first' \\
+    '*:argument:->rest'
+  case $state in
+    first)
+      local -a cmds
+      cmds=('fn:diff one function' 'roots:list linked sibling services' 'completions:print shell completions')
+      _describe -t commands 'flowdiff command' cmds
+      __flowdiff_refs
+      ;;
+    rest)
+      if [[ \${words[2]} == fn && CURRENT -eq 3 ]]; then
+        __flowdiff_fns
+      elif [[ \${words[2]} == completions ]]; then
+        compadd zsh
+      else
+        __flowdiff_refs
+      fi
+      ;;
+  esac
+}
+compdef _flowdiff flowdiff
 `;
 
 function loadGraph(ref: string, cwd: string): Graph {
@@ -57,12 +99,33 @@ function main(): void {
     return;
   }
 
+  if (args[0] === "completions") {
+    if (args[1] && args[1] !== "zsh") {
+      process.stderr.write("flowdiff: only zsh completions exist so far\n");
+      process.exit(1);
+    }
+    process.stdout.write(ZSH_COMPLETIONS);
+    return;
+  }
+
   let cwd: string;
   try {
     cwd = repoRoot(process.cwd());
   } catch {
     process.stderr.write("flowdiff: not inside a git repository\n");
     process.exit(1);
+  }
+
+  // Hidden: feeds `flowdiff fn <TAB>` — unique function names in the worktree.
+  if (argv.includes("--list-fns")) {
+    const graph = loadGraph(WORKTREE, cwd);
+    const names = new Set<string>();
+    for (const fn of graph.fns.values()) {
+      names.add(fn.name);
+      if (names.size >= 5000) break;
+    }
+    process.stdout.write([...names].sort().join("\n") + "\n");
+    return;
   }
 
   if (args[0] === "roots") {
