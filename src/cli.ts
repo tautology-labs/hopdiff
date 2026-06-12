@@ -179,6 +179,13 @@ function main(): void {
     const hits = findFn(headGraph, fnName);
     if (hits.length === 0) {
       process.stderr.write(`flowdiff: no function named "${fnName}" at ${label(head)}\n`);
+      const near = [...headGraph.fns.values()]
+        .filter((f) => f.name.toLowerCase().includes(fnName.toLowerCase()))
+        .slice(0, 8);
+      if (near.length > 0) {
+        process.stderr.write("did you mean:\n");
+        for (const f of near) process.stderr.write(`  ${f.name}  (${f.file})\n`);
+      }
       process.exit(1);
     }
     if (hits.length > 1) {
