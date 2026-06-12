@@ -47,6 +47,9 @@ const STEER =
 const taskNames = readdirSync(join(benchDir, "tasks")).filter(
   (n) => !n.startsWith("."),
 );
+const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+const transcriptDir = join(benchDir, "results", `transcripts-${stamp}`);
+mkdirSync(transcriptDir, { recursive: true });
 const results = [];
 
 for (const taskName of taskNames) {
@@ -110,7 +113,8 @@ for (const taskName of taskNames) {
       "-p",
       cond === "flowdiff" ? prompt + STEER : prompt,
       "--output-format",
-      "json",
+      "stream-json",
+      "--verbose",
       "--dangerously-skip-permissions",
       "--strict-mcp-config",
     ];
@@ -135,12 +139,36 @@ for (const taskName of taskNames) {
       timeout: timeoutMs,
       maxBuffer: 64 * 1024 * 1024,
     });
+    // stream-json emits one JSON object per line: system/assistant/user/result.
+    // Pull the final result, and tally every tool the agent actually called.
     let meta = {};
-    try {
-      meta = JSON.parse(agent.stdout);
-    } catch {
-      // timeout or crash — grade anyway; an unfixed repo just fails
+    const toolUse = {};
+    for (const line of agent.stdout.split("\n")) {
+      if (!line.trim()) continue;
+      let evt;
+      try {
+        evt = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (evt.type === "result") meta = evt;
+      if (evt.type === "assistant") {
+        for (const block of evt.message?.content ?? []) {
+          if (block.type === "tool_use") {
+            toolUse[block.name] = (toolUse[block.name] ?? 0) + 1;
+          }
+        }
+      }
     }
+    const flowdiffCalls = Object.entries(toolUse)
+      .filter(([n]) => n.includes("flowdiff"))
+      .reduce((s, [, c]) => s + c, 0);
+
+    const transcriptPath = join(
+      transcriptDir,
+      `${taskName}-${cond}-s${seed}.jsonl`,
+    );
+    writeFileSync(transcriptPath, agent.stdout);
 
     let graded;
     if (spec?.repo) {
@@ -168,11 +196,19 @@ for (const taskName of taskNames) {
       cost_usd: meta.total_cost_usd ?? null,
       turns: meta.num_turns ?? null,
       wall_s: Math.round((Date.now() - t0) / 1000),
-      agent_said: (meta.result ?? "").slice(0, 500),
+      tool_use: toolUse,
+      flowdiff_calls: flowdiffCalls,
+      read_calls: (toolUse.Read ?? 0) + (toolUse.Grep ?? 0) + (toolUse.Glob ?? 0),
+      agent_said: (meta.result ?? "").slice(0, 800),
+      transcript: transcriptPath,
       workdir: proj,
     });
+    const toolNote =
+      cond === "flowdiff"
+        ? ` · flowdiff×${flowdiffCalls} read×${(toolUse.Read ?? 0) + (toolUse.Grep ?? 0) + (toolUse.Glob ?? 0)}`
+        : ` · read×${(toolUse.Read ?? 0) + (toolUse.Grep ?? 0) + (toolUse.Glob ?? 0)}`;
     console.error(
-      `  ${pass ? "PASS" : "FAIL"} · $${meta.total_cost_usd?.toFixed?.(2) ?? "?"} · ${meta.num_turns ?? "?"} turns · ${Math.round((Date.now() - t0) / 1000)}s`,
+      `  ${pass ? "PASS" : "FAIL"} · $${meta.total_cost_usd?.toFixed?.(2) ?? "?"} · ${meta.num_turns ?? "?"} turns · ${Math.round((Date.now() - t0) / 1000)}s${toolNote}`,
     );
   }
   }
@@ -180,7 +216,6 @@ for (const taskName of taskNames) {
 
 const outDir = join(benchDir, "results");
 mkdirSync(outDir, { recursive: true });
-const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 writeFileSync(join(outDir, `run-${stamp}.json`), JSON.stringify(results, null, 2));
 console.log(
   JSON.stringify(
@@ -195,17 +230,19 @@ if (seeds > 1) {
   const cells = new Map();
   for (const r of results) {
     const key = `${r.task} / ${r.cond}`;
-    const cell = cells.get(key) ?? { n: 0, passes: 0, cost: 0, turns: 0 };
+    const cell = cells.get(key) ?? { n: 0, passes: 0, cost: 0, turns: 0, fd: 0, rd: 0 };
     cell.n++;
     cell.passes += r.pass ? 1 : 0;
     cell.cost += r.cost_usd ?? 0;
     cell.turns += r.turns ?? 0;
+    cell.fd += r.flowdiff_calls ?? 0;
+    cell.rd += r.read_calls ?? 0;
     cells.set(key, cell);
   }
   console.log("\nsummary:");
   for (const [key, c] of cells) {
     console.log(
-      `  ${key}: ${c.passes}/${c.n} pass · avg $${(c.cost / c.n).toFixed(2)} · avg ${(c.turns / c.n).toFixed(1)} turns`,
+      `  ${key}: ${c.passes}/${c.n} pass · avg $${(c.cost / c.n).toFixed(2)} · avg ${(c.turns / c.n).toFixed(1)} turns · avg flowdiff×${(c.fd / c.n).toFixed(1)} read×${(c.rd / c.n).toFixed(1)}`,
     );
   }
 }
