@@ -91,12 +91,20 @@ const TOOLS = [
   {
     name: "function_info",
     description:
-      "One function's source plus its graph neighborhood: callers (who reaches it), callees (where it goes), and external calls. The graph spans locally-linked sibling services, so callers/callees cross service boundaries — use this to find every consumer of a shared contract before changing it, then walk the call stack hop by hop without reading whole files.",
+      "One function's source plus its graph neighborhood: callers (who reaches it), callees (where it goes), and external calls. The graph spans locally-linked sibling services, so callers/callees cross service boundaries — use this to find every consumer of a shared contract before changing it, then walk the call stack hop by hop without reading whole files. Heavily-called functions return callers_total plus a callers_by_dir group summary; drill into one group with callers_filter.",
     inputSchema: {
       type: "object",
       properties: {
         name: { type: "string", description: "Function name, Class.method, or file#name id." },
         ref: { type: "string", description: "Git ref, or 'worktree' (default)." },
+        callers_filter: {
+          type: "string",
+          description: "Only callers whose file path contains this substring (use a callers_by_dir key to expand that group).",
+        },
+        callers_limit: {
+          type: "number",
+          description: "Max callers returned (default 15, max 200).",
+        },
       },
       required: ["name"],
     },
@@ -173,13 +181,37 @@ function callTool(name: string, args: Args): unknown {
     const g = graphAt(ref);
     const fn = resolveOne(g, args.name as string);
     const callees = [...g.edges.values()].filter((e) => e.fromId === fn.id);
+
+    const allCallers = (g.callersOf.get(fn.id) ?? [])
+      .map((e) => g.fns.get(e.fromId))
+      .filter((c): c is FnInfo => c !== undefined);
+    const filter = (args.callers_filter as string) || "";
+    const limit = Math.min(Number(args.callers_limit) || 15, 200);
+    const filtered = filter
+      ? allCallers.filter((c) => c.file.includes(filter))
+      : allCallers;
+    const truncated = filtered.length > limit;
+
+    // Group summary so an agent can see the shape of 500 callers without
+    // paying for 500 entries, then expand one group via callers_filter.
+    const dirOf = (file: string) =>
+      file.split("/").slice(0, -1).slice(0, 3).join("/") || ".";
+    const byDir: Record<string, number> = {};
+    for (const c of allCallers) byDir[dirOf(c.file)] = (byDir[dirOf(c.file)] ?? 0) + 1;
+
     return {
       ...slim(fn),
       source: fn.source,
-      callers: (g.callersOf.get(fn.id) ?? []).map((e) => {
-        const caller = g.fns.get(e.fromId);
-        return caller ? slim(caller) : { id: e.fromId };
-      }),
+      callers_total: allCallers.length,
+      ...(filter ? { callers_filter: filter, callers_matching: filtered.length } : {}),
+      callers: filtered.slice(0, limit).map(slim),
+      ...(truncated || allCallers.length > limit
+        ? {
+            callers_truncated: truncated,
+            callers_by_dir: byDir,
+            hint: "expand a group with callers_filter, e.g. callers_filter: '<a callers_by_dir key>'",
+          }
+        : {}),
       callees: callees
         .filter((e) => !e.external)
         .map((e) => {
