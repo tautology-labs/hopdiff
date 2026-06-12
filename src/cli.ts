@@ -19,6 +19,10 @@ Flags:
   -i        interactive mode — navigate the graph, expand diffs, e to edit
   --json    machine-readable output (for scripts, or for feeding an AI)
   --help    this text
+
+Languages: TypeScript, JavaScript, Java, Python.
+MCP server (callers/callees/flow_diff/blast_radius tools for AI agents):
+  claude mcp add flowdiff -- node <path-to-flowdiff>/dist/mcp.js
 `;
 
 function loadGraph(ref: string, cwd: string): Graph {
