@@ -7,7 +7,7 @@
  * Hand-rolled JSON-RPC (newline-delimited) — no SDK dependency.
  */
 import { createInterface } from "node:readline";
-import { listSourceFiles, readFileAt, repoRoot, resolveRef, WORKTREE } from "./git.js";
+import { listSourceFiles, readFilesAt, repoRoot, resolveRef, WORKTREE } from "./git.js";
 import {
   buildGraph,
   diffGraphs,
@@ -37,8 +37,10 @@ function graphAt(ref: string): Graph {
   } else if (worktreeGraph && Date.now() - worktreeGraph.at < WORKTREE_TTL_MS) {
     return worktreeGraph.graph;
   }
-  const files = listSourceFiles(resolved, cwd)
-    .map((path) => ({ path, text: readFileAt(resolved, path, cwd) }))
+  const paths = listSourceFiles(resolved, cwd);
+  const texts = readFilesAt(resolved, paths, cwd);
+  const files = paths
+    .map((path) => ({ path, text: texts.get(path) ?? null }))
     .filter((f): f is { path: string; text: string } => f.text !== null);
   const graph = buildGraph(files);
   if (resolved !== WORKTREE) cache.set(resolved, graph);

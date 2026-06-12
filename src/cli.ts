@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { listSourceFiles, readFileAt, repoRoot, resolveRef, WORKTREE } from "./git.js";
+import { listSourceFiles, readFilesAt, repoRoot, resolveRef, WORKTREE } from "./git.js";
 import { buildGraph, diffGraphs, diffJson, findFn, type Graph } from "./graph.js";
 import { renderDiff, renderFnDiff } from "./render.js";
 import { runTui } from "./tui.js";
@@ -20,8 +20,10 @@ Flags:
 `;
 
 function loadGraph(ref: string, cwd: string): Graph {
-  const files = listSourceFiles(ref, cwd)
-    .map((path) => ({ path, text: readFileAt(ref, path, cwd) }))
+  const paths = listSourceFiles(ref, cwd);
+  const texts = readFilesAt(ref, paths, cwd);
+  const files = paths
+    .map((path) => ({ path, text: texts.get(path) ?? null }))
     .filter((f): f is { path: string; text: string } => f.text !== null);
   return buildGraph(files);
 }

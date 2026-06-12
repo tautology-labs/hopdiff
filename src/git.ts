@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -46,4 +46,66 @@ export function readFileAt(ref: string, path: string, cwd: string): string | nul
   } catch {
     return null; // file absent at this revision
   }
+}
+
+/**
+ * Read many files at one revision through a single `git cat-file --batch`
+ * process — one subprocess per graph build instead of one per file.
+ * Worktree reads stay plain fs reads. Absent files map to null.
+ */
+export function readFilesAt(
+  ref: string,
+  paths: string[],
+  cwd: string,
+): Map<string, string | null> {
+  const texts = new Map<string, string | null>();
+  if (ref === WORKTREE) {
+    for (const path of paths) texts.set(path, readFileAt(ref, path, cwd));
+    return texts;
+  }
+
+  // --batch requests are newline-delimited, so a path containing a newline
+  // can't be asked for; treat it as absent rather than corrupting the stream.
+  const requested = paths.filter((path) => {
+    if (path.includes("\n")) {
+      texts.set(path, null);
+      return false;
+    }
+    return true;
+  });
+  if (requested.length === 0) return texts;
+
+  const res = spawnSync("git", ["cat-file", "--batch"], {
+    cwd,
+    input: requested.map((path) => `${ref}:${path}\n`).join(""),
+    maxBuffer: 256 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  if (res.error) throw res.error;
+  if (res.status !== 0) {
+    throw new Error(`git cat-file --batch failed: ${res.stderr?.toString() ?? ""}`);
+  }
+
+  // Responses arrive in request order: `<sha> <type> <size>\n<content>\n`,
+  // or a single `<request> missing\n` line. Sizes are bytes, so parse over
+  // the raw buffer and decode each content slice on its own.
+  const out = res.stdout;
+  let off = 0;
+  for (const path of requested) {
+    const nl = out.indexOf(0x0a, off);
+    if (nl === -1) {
+      texts.set(path, null); // truncated output — treat the rest as absent
+      continue;
+    }
+    const header = out.subarray(off, nl).toString("utf8").split(" ");
+    off = nl + 1;
+    const size = Number(header[2]);
+    if (header.length !== 3 || !Number.isFinite(size)) {
+      texts.set(path, null); // "missing" / "ambiguous" — no content follows
+      continue;
+    }
+    texts.set(path, out.subarray(off, off + size).toString("utf8"));
+    off += size + 1; // content plus its trailing newline
+  }
+  return texts;
 }
