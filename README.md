@@ -134,4 +134,5 @@ Name-based call resolution is a deliberate v0 heuristic: it's wrong in the ways 
 - Go and friends (one extractor file each); production-grade Python via tree-sitter-WASM
 - Java overload merging (one logical function instead of suffixed candidates)
 - Cross-repo *historical* diff (multi-root spans working trees; commit-pair diffs stay single-repo)
+- Docs drift: the graph knows which functions a diff renamed or removed — intersect with the names your README/docs still mention, and stale documentation becomes a diff-time warning instead of a slow embarrassment
 - Differential tracing: run the test suite at both revisions under instrumentation and diff the *runtime* call patterns — catch the change that makes an input loop forever or allocate unboundedly
