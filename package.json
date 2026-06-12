@@ -12,8 +12,21 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "tsc && node --test dist/*.test.js"
+    "test": "tsc && node --test dist/*.test.js",
+    "prepublishOnly": "npm test"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tautology-labs/flowdiff.git"
+  },
+  "keywords": [
+    "code-review",
+    "call-graph",
+    "diff",
+    "ai-code-review",
+    "mcp",
+    "incident-response"
+  ],
   "dependencies": {
     "java-parser": "^3.0.1",
     "typescript": "^5.5.0"
