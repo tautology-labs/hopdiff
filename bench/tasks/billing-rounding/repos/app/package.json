@@ -1,0 +1,8 @@
+{
+  "name": "billing-app",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@acme/money": "file:../lib"
+  }
+}

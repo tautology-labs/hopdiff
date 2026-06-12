@@ -1,0 +1,13 @@
+diff --git a/lib/utils.js b/lib/utils.js
+index 4f21e7ef..f2302e95 100644
+--- a/lib/utils.js
++++ b/lib/utils.js
+@@ -201,7 +201,7 @@ exports.compileTrust = function(val) {
+ 
+   if (typeof val === 'number') {
+     // Support trusting hop count
+-    return function(a, i){ return i < val };
++    return function(a, i){ return i <= val };
+   }
+ 
+   if (typeof val === 'string') {

@@ -1,0 +1,6 @@
+{
+  "name": "@acme/money",
+  "version": "1.2.3",
+  "type": "module",
+  "main": "src/index.js"
+}

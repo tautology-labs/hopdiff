@@ -1,0 +1,5 @@
+{
+  "kind": "multi",
+  "primary": "app",
+  "links": [{ "from": "app/node_modules/@acme/money", "to": "lib" }]
+}

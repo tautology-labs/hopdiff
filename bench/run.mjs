@@ -22,6 +22,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +39,7 @@ const onlyTask = opt("task", null);
 const condArg = opt("cond", "both");
 const conditions = condArg === "both" ? ["control", "flowdiff"] : [condArg];
 const timeoutMs = Number(opt("timeout", "600")) * 1000;
+const seeds = Number(opt("seeds", "1"));
 
 const STEER =
   "\n\nYou have flowdiff MCP tools (find_functions, function_info, flow_diff, function_diff) that serve this repo's call graph; prefer them over reading whole files when following code paths.";
@@ -58,8 +60,8 @@ for (const taskName of taskNames) {
   const spec = existsSync(specPath)
     ? JSON.parse(readFileSync(specPath, "utf8"))
     : null;
-  const cacheDir = spec ? join(benchDir, "cache", taskName) : null;
-  if (spec && !existsSync(cacheDir)) {
+  const cacheDir = spec?.repo ? join(benchDir, "cache", taskName) : null;
+  if (spec?.repo && !existsSync(cacheDir)) {
     console.error(`▸ caching ${spec.repo} @ ${spec.sha.slice(0, 8)} (one-time)`);
     execSync(`git clone --quiet ${spec.repo} ${cacheDir}`, { stdio: "ignore" });
     execSync(`git checkout --quiet ${spec.sha}`, { cwd: cacheDir, stdio: "ignore" });
@@ -67,9 +69,27 @@ for (const taskName of taskNames) {
   }
 
   for (const cond of conditions) {
+  for (let seed = 1; seed <= seeds; seed++) {
     const work = mkdtempSync(join(tmpdir(), `bench-${taskName}-${cond}-`));
-    const proj = join(work, "repo");
-    if (spec) {
+    const gitInit = (dir) =>
+      execSync(
+        "git init -qb main && git add -A && git -c user.name=bench -c user.email=bench@bench commit -qm import",
+        { cwd: dir, stdio: "ignore" },
+      );
+    let proj;
+    if (spec?.kind === "multi") {
+      // Sibling git repos; the primary's node_modules links to its neighbor.
+      for (const name of readdirSync(join(taskDir, "repos"))) {
+        cpSync(join(taskDir, "repos", name), join(work, name), { recursive: true });
+        gitInit(join(work, name));
+      }
+      for (const link of spec.links) {
+        mkdirSync(dirname(join(work, link.from)), { recursive: true });
+        symlinkSync(join(work, link.to), join(work, link.from), "dir");
+      }
+      proj = join(work, spec.primary);
+    } else if (spec) {
+      proj = join(work, "repo");
       cpSync(cacheDir, proj, { recursive: true });
       execSync(`git apply ${join(taskDir, spec.bugPatch)}`, {
         cwd: proj,
@@ -79,13 +99,12 @@ for (const taskName of taskNames) {
       // Replace the clone's history with one innocent commit, so the planted
       // bug and withheld tests aren't readable straight out of `git show`.
       rmSync(join(proj, ".git"), { recursive: true, force: true });
+      gitInit(proj);
     } else {
+      proj = join(work, "repo");
       cpSync(join(taskDir, "repo"), proj, { recursive: true });
+      gitInit(proj);
     }
-    execSync(
-      "git init -qb main && git add -A && git -c user.name=bench -c user.email=bench@bench commit -qm import",
-      { cwd: proj, stdio: "ignore" },
-    );
 
     const cliArgs = [
       "-p",
@@ -108,7 +127,7 @@ for (const taskName of taskNames) {
       cliArgs.push("--mcp-config", cfg);
     }
 
-    console.error(`▶ ${taskName} / ${cond}`);
+    console.error(`▶ ${taskName} / ${cond}${seeds > 1 ? ` / seed ${seed}` : ""}`);
     const t0 = Date.now();
     const agent = spawnSync("claude", cliArgs, {
       cwd: proj,
@@ -124,7 +143,7 @@ for (const taskName of taskNames) {
     }
 
     let graded;
-    if (spec) {
+    if (spec?.repo) {
       for (const h of spec.holdout) cpSync(join(cacheDir, h), join(proj, h));
       graded = spawnSync("sh", ["-c", spec.gradeCmd], {
         cwd: proj,
@@ -144,6 +163,7 @@ for (const taskName of taskNames) {
     results.push({
       task: taskName,
       cond,
+      seed,
       pass,
       cost_usd: meta.total_cost_usd ?? null,
       turns: meta.num_turns ?? null,
@@ -154,6 +174,7 @@ for (const taskName of taskNames) {
     console.error(
       `  ${pass ? "PASS" : "FAIL"} · $${meta.total_cost_usd?.toFixed?.(2) ?? "?"} · ${meta.num_turns ?? "?"} turns · ${Math.round((Date.now() - t0) / 1000)}s`,
     );
+  }
   }
 }
 
@@ -168,3 +189,23 @@ console.log(
     2,
   ),
 );
+
+// Aggregate per task × condition when seeded.
+if (seeds > 1) {
+  const cells = new Map();
+  for (const r of results) {
+    const key = `${r.task} / ${r.cond}`;
+    const cell = cells.get(key) ?? { n: 0, passes: 0, cost: 0, turns: 0 };
+    cell.n++;
+    cell.passes += r.pass ? 1 : 0;
+    cell.cost += r.cost_usd ?? 0;
+    cell.turns += r.turns ?? 0;
+    cells.set(key, cell);
+  }
+  console.log("\nsummary:");
+  for (const [key, c] of cells) {
+    console.log(
+      `  ${key}: ${c.passes}/${c.n} pass · avg $${(c.cost / c.n).toFixed(2)} · avg ${(c.turns / c.n).toFixed(1)} turns`,
+    );
+  }
+}
