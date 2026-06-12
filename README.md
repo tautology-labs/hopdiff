@@ -67,7 +67,16 @@ Run it from anywhere inside a git repo. `+` added, `−` removed, `~` body chang
 npm install && npm run build && npm link
 ```
 
-Node ≥ 18. **Languages: TypeScript, JavaScript, Java, and Python — including Jupyter notebooks** (`.ipynb` code cells route through the Python extractor; magics and shell lines are skipped). Two runtime dependencies, both pure JS, both parsers: the TypeScript compiler for TS/JS, and `java-parser` (Chevrotain) for Java; the Python extractor is hand-rolled (Python's `def`/indent structure makes that honest — strings and comments are blanked, brackets tracked, scopes close on dedent) with tree-sitter-via-WASM as the upgrade path if it needs to be production-grade. Adding a language means writing one extractor file answering "what's a function, what does it call"; everything else — graph, diff, rename detection, TUI, MCP tools — is language-agnostic. Python caveat: dynamic dispatch (`getattr`, exec, decorators that rewire) is invisible to any static graph, and untyped attribute calls make name-based resolution noisier than in TS/Java.
+Node ≥ 18. Two runtime dependencies, both pure JS, both parsers — no native modules. Adding a language means writing one extractor file answering "what's a function, what does it call"; everything else — graph, diff, rename detection, TUI, MCP tools — is language-agnostic.
+
+## Languages
+
+| language | parser | extracted | honest caveats |
+|---|---|---|---|
+| TypeScript / JavaScript (`.tsx`/`.jsx`/`.mjs`/`.cjs` too) | the TypeScript compiler | functions, methods, arrow/function-expression consts, constructors, accessors; calls inside closures attribute to the enclosing named function | call resolution is name-based (same-file preferred) — wrong in the ways dynamic dispatch is wrong |
+| Java | `java-parser` (Chevrotain, pure JS) | methods and constructors as `Class.method` / `Class.constructor`, incl. nested types, fluent/static/`this.` call chains | overloads share a name → bare-name queries list candidate ids; anonymous-class calls attribute to the anonymous member |
+| Python | built-in extractor (strings/comments blanked, bracket-aware indent scoping) | `def`/`async def`, methods as `Class.method`, decorators included in source and line | dynamic dispatch (`getattr`, exec) invisible to any static graph; untyped attribute calls resolve noisier than TS/Java; tree-sitter-WASM is the upgrade path |
+| Jupyter (`.ipynb`) | code cells → Python extractor | same as Python | magics/`!shell` lines skipped; line numbers refer to concatenated cells, not cell positions |
 
 ## MCP — give the graph to your agent
 
@@ -118,8 +127,11 @@ Name-based call resolution is a deliberate v0 heuristic: it's wrong in the ways 
 
 ## Not yet
 
+- `--html`: a self-contained interactive graph export — clickable nodes, diff side panel; the artifact you attach to a PR (next up)
+- A GitHub Action that posts the flow summary (and the HTML artifact) as a PR comment
 - Branch-level deltas (new `if`/`switch` arms inside a changed function)
-- Rename detection for *edited* renames (exact-body renames are detected; renamed-and-changed still shows as remove + add)
-- More languages (Java landed as the second extractor; Python/Go would follow the same one-file pattern)
-- A GitHub Action that posts the flow summary as a PR comment
+- Rename detection for *edited* renames (exact-body renames and moves are detected; renamed-and-changed still shows as remove + add)
+- Go and friends (one extractor file each); production-grade Python via tree-sitter-WASM
+- Java overload merging (one logical function instead of suffixed candidates)
+- Cross-repo *historical* diff (multi-root spans working trees; commit-pair diffs stay single-repo)
 - Differential tracing: run the test suite at both revisions under instrumentation and diff the *runtime* call patterns — catch the change that makes an input loop forever or allocate unboundedly
