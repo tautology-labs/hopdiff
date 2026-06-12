@@ -1,0 +1,9 @@
+{
+  "kind": "repo",
+  "repo": "https://github.com/eslint/eslint",
+  "sha": "b5657837604fa5e8cf1278074782025cadd34b6c",
+  "install": "npm install --no-audit --no-fund",
+  "bugPatch": "bug.patch",
+  "holdout": ["tests/lib/linter/source-code-fixer.js"],
+  "gradeCmd": "npx mocha tests/lib/linter/source-code-fixer.js --reporter min"
+}

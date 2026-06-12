@@ -1,0 +1,13 @@
+diff --git a/lib/linter/source-code-fixer.js b/lib/linter/source-code-fixer.js
+index 2cea2c6..db59fc8 100644
+--- a/lib/linter/source-code-fixer.js
++++ b/lib/linter/source-code-fixer.js
+@@ -89,7 +89,7 @@ SourceCodeFixer.applyFixes = function (sourceText, messages, shouldFix) {
+ 		const end = fix.range[1];
+ 
+ 		// Remain it as a problem if it's overlapped or it's a negative range
+-		if (lastPos >= start || start > end) {
++		if (lastPos > start || start > end) {
+ 			remainingMessages.push(problem);
+ 			return false;
+ 		}

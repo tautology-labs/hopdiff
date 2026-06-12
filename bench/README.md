@@ -30,12 +30,17 @@ Each task isolates a variable; grep and graph traversal should diverge where con
 | `billing-rounding` | multi-repo | **boundary, rung 2**: the *same* bug as workspace-money, but the library is a separate git repo linked through node_modules — flowdiff's graph is blind past the boundary. Deliberately adversarial; measures the cost of the blind spot. |
 | `express-etag` | real repo | real codebase, **strong scent** (symptom names the mechanism) |
 | `express-trust` | real repo | real codebase, **weak scent** (security symptom describes behavior only; cause is an off-by-one in `compileTrust`, hops from any keyword in the report) |
+| `eslint-autofix` | real repo | **big repo, weak scent** (~380 source files; symptom is "`--fix` corrupts touching edits"; cause is `>=`→`>` deep in `source-code-fixer.js`, many hops below the lint API, no keyword to grep) |
 
 The `workspace-money` / `billing-rounding` pair is the controlled comparison: identical defect, identical symptom, only the repo boundary differs. If the flowdiff condition degrades on rung 2, that quantifies the value of multi-root graph support before it's built.
 
-## Honest limitations (v0)
+## What the runs show so far
 
-- Two tasks, single runs — anecdote-sized. Real conclusions need ~a dozen tasks × several seeds per condition; pass-rate deltas on n=2 are noise.
-- Fixture repos are small enough that a model can read *everything* and not get lost — the thesis predicts the gap appears as repo size grows. Larger fixture repos (or real repos with replanted bugs) are the next step.
-- The flowdiff condition is *steered* (one sentence pointing at the tools). That measures capability ("does traversal help when used"), not adoption ("do agents reach for it unprompted"). Both are worth measuring; unsteered runs are a flag away from existing.
-- Tasks were authored knowing the tool being tested. Defended by the script grader and the guard tests, but task-selection bias is real until tasks come from organic sources (real regressions, other people's repos).
+At every scale tested through ~200 files, **pass rate saturates at 100% for both conditions** — and where everything passes, the only measurable axis is cost, on which the flowdiff condition consistently *loses* (~30–50% more turns: the tools' schemas and traversal are overhead the agent doesn't need when it can just read the whole repo). The one-time express-etag run where flowdiff looked cheaper was n=1 noise; 3 seeds erased it. This is the expected shape: the thesis only predicts an advantage where the agent would otherwise **get lost**, which can't happen in a repo small enough to read end to end. `eslint-autofix` is the first task whose repo is plausibly too big for that — it's the cell that can actually move pass rate, not just cost.
+
+## Honest limitations
+
+- Most tasks saturate pass rate, so they measure cost, not capability. The interesting result lives at a scale where the control sometimes *fails* — that's what `eslint-autofix` (and bigger) are for.
+- The flowdiff condition is *steered* (one sentence pointing at the tools). That measures capability ("does traversal help when used"), not adoption ("do agents reach for it unprompted"). Both matter; unsteered runs are a flag away.
+- Tasks were authored knowing the tool being tested. Defended by the script grader and guard tests, but task-selection bias is real until tasks come from organic sources (real regressions, other people's repos).
+- `eslint-autofix`'s cause and its catching test live in the same module; the *agent's* traversal distance (behavioral symptom → fixer internals) is the point, not the test's distance.
