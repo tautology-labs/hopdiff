@@ -120,6 +120,16 @@ The working-tree graph spans **locally-linked sibling services**, not just one r
 npm test   # 20 unit tests, node:test, no test framework
 ```
 
+## Every edge tells you how it's known
+
+Call resolution is name-based, so some links are certain and some are guesses — and flowdiff says which. Every edge carries a `confidence`:
+
+- **high** — the call resolved to exactly one definition
+- **low** — the name had multiple candidates; flowdiff linked heuristically (a guess to verify)
+- **external** — the callee isn't defined in this repo
+
+It's a *property of every edge*, not a separate query — provenance travels with the data so you can never receive a link without knowing how much to trust it. `--json` and the MCP tools include it on every edge always; the terminal marks only low-confidence links with a dim `?` (annotate the exception, not the rule); `--html` draws them faintly dashed; and `blast` flags any path that *depends on* an uncertain edge — because you shouldn't pin an incident mitigation to a guess. The field is forward-compatible: type-checker-`proven` and model-`predicted` tiers slot in without reshaping anything.
+
 ## How it works
 
 1. Lists `.ts`/`.tsx`/`.js`/`.jsx` files at both revisions (`git ls-tree` / working tree).

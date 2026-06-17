@@ -14,6 +14,7 @@ import {
   diffGraphs,
   diffJson,
   findFn,
+  pathHasLowConfidence,
   pathsToTargets,
   type Graph,
 } from "./graph.js";
@@ -184,12 +185,12 @@ function callTool(name: string, args: Args): unknown {
     const callees = [...g.edges.values()].filter((e) => e.fromId === fn.id);
 
     const allCallers = (g.callersOf.get(fn.id) ?? [])
-      .map((e) => g.fns.get(e.fromId))
-      .filter((c): c is FnInfo => c !== undefined);
+      .map((e) => ({ fn: g.fns.get(e.fromId), confidence: e.confidence }))
+      .filter((c): c is { fn: FnInfo; confidence: typeof c.confidence } => c.fn !== undefined);
     const filter = (args.callers_filter as string) || "";
     const limit = Math.min(Number(args.callers_limit) || 15, 200);
     const filtered = filter
-      ? allCallers.filter((c) => c.file.includes(filter))
+      ? allCallers.filter((c) => c.fn.file.includes(filter))
       : allCallers;
     const truncated = filtered.length > limit;
 
@@ -198,14 +199,14 @@ function callTool(name: string, args: Args): unknown {
     const dirOf = (file: string) =>
       file.split("/").slice(0, -1).slice(0, 3).join("/") || ".";
     const byDir: Record<string, number> = {};
-    for (const c of allCallers) byDir[dirOf(c.file)] = (byDir[dirOf(c.file)] ?? 0) + 1;
+    for (const c of allCallers) byDir[dirOf(c.fn.file)] = (byDir[dirOf(c.fn.file)] ?? 0) + 1;
 
     return {
       ...slim(fn),
       source: fn.source,
       callers_total: allCallers.length,
       ...(filter ? { callers_filter: filter, callers_matching: filtered.length } : {}),
-      callers: filtered.slice(0, limit).map(slim),
+      callers: filtered.slice(0, limit).map((c) => ({ ...slim(c.fn), confidence: c.confidence })),
       ...(truncated || allCallers.length > limit
         ? {
             callers_truncated: truncated,
@@ -217,9 +218,10 @@ function callTool(name: string, args: Args): unknown {
         .filter((e) => !e.external)
         .map((e) => {
           const callee = g.fns.get(e.toId);
-          return callee ? slim(callee) : { id: e.toId };
+          return { ...(callee ? slim(callee) : { id: e.toId }), confidence: e.confidence };
         }),
       external_calls: callees.filter((e) => e.external).map((e) => e.toName),
+      confidence_note: "low = name matched >1 candidate (heuristic link, verify before trusting)",
     };
   }
 
@@ -242,6 +244,7 @@ function callTool(name: string, args: Args): unknown {
         function: slim(headGraph.fns.get(id)!),
         change: changedKind.get(id),
         path: path.map((p) => p.split("#").pop()),
+        uncertain: pathHasLowConfidence(headGraph, path),
       }));
 
     return {

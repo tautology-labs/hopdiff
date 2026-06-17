@@ -1,5 +1,5 @@
 import type { FnInfo } from "./extract.js";
-import type { Edge, Graph, GraphDiff } from "./graph.js";
+import { pathHasLowConfidence, type Edge, type Graph, type GraphDiff } from "./graph.js";
 import { bold, cyan, dim, green, red, yellow } from "./ansi.js";
 import { diffLines } from "./linediff.js";
 
@@ -122,17 +122,19 @@ export function renderFnBlock(
     out.push(`${INDENT}${INDENT}${dim(label.padEnd(10))}${parts.join("  ")}`);
   };
 
+  // Low-confidence edges (ambiguous name resolution) get a dim "?" so a
+  // reader knows the link is a heuristic guess, not a proven call.
+  const unsure = (e: Edge) => (e.confidence === "low" ? dim("?") : "");
+
   // Callers: who reaches this function now (or did, if removed).
   const callers = current.callersOf.get(fn.id) ?? [];
   const newCallerIds = new Set((ch.addedByTo.get(fn.id) ?? []).map((e) => e.fromId));
   const lostCallers = isRemoved ? [] : (ch.removedByTo.get(fn.id) ?? []);
   const callerParts = [
     ...callers.map((e) =>
-      newCallerIds.has(e.fromId)
-        ? green("+") + ref(e.fromId, fn.file, current)
-        : ref(e.fromId, fn.file, current),
+      (newCallerIds.has(e.fromId) ? green("+") : "") + ref(e.fromId, fn.file, current) + unsure(e),
     ),
-    ...lostCallers.map((e) => red("−") + ref(e.fromId, fn.file, base)),
+    ...lostCallers.map((e) => red("−") + ref(e.fromId, fn.file, base) + unsure(e)),
   ];
   if (callerParts.length > 0) {
     row("callers", callerParts);
@@ -146,7 +148,7 @@ export function renderFnBlock(
   const newCallKeys = new Set((ch.addedByFrom.get(fn.id) ?? []).map((e) => e.toId));
   const lostCalls = isRemoved ? [] : (ch.removedByFrom.get(fn.id) ?? []);
   const part = (e: Edge, graph: Graph, mark: string) =>
-    mark + ref(e.toId, fn.file, graph);
+    mark + ref(e.toId, fn.file, graph) + unsure(e);
   const inRepoParts = [
     ...calls
       .filter((e) => !e.external)
@@ -260,8 +262,9 @@ export function renderBlast(
     for (const [id, path] of paths) {
       const fn = headGraph.fns.get(id);
       const mark = KIND_MARK[changedKind.get(id) ?? ""] ?? " ";
+      const flag = pathHasLowConfidence(headGraph, path) ? dim(" ? uncertain link") : "";
       out.push(
-        `${INDENT}${INDENT}${mark} ${bold(shortName(id))} ${dim(`(${fileOf(id)}:${fn?.line ?? "?"})`)}`,
+        `${INDENT}${INDENT}${mark} ${bold(shortName(id))} ${dim(`(${fileOf(id)}:${fn?.line ?? "?"})`)}${flag}`,
       );
       out.push(`${INDENT}${INDENT}${INDENT}${pathStr(path)}`);
     }

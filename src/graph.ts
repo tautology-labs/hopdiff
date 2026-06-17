@@ -1,12 +1,23 @@
 import type { FnInfo } from "./extract.js";
 import { extractAny } from "./extractors.js";
 
+/**
+ * How an edge was resolved — its trust level. Forward-compatible: future
+ * "proven" (type-checker-resolved) and "predicted" (model) tiers slot in here
+ * without reshaping anything downstream.
+ *  - high:     the call resolved to exactly one definition
+ *  - low:      the name had multiple candidates; linked heuristically (a guess)
+ *  - external: the callee isn't defined in the repo (an `ext:` node)
+ */
+export type Confidence = "high" | "low" | "external";
+
 export interface Edge {
   fromId: string;
   /** Resolved fn id, or `ext:<name>` when the callee isn't defined in the repo. */
   toId: string;
   toName: string;
   external: boolean;
+  confidence: Confidence;
 }
 
 export interface Graph {
@@ -79,17 +90,25 @@ export function buildGraph(files: { path: string; text: string }[]): Graph {
       const local = targets.filter((t) => t.file === fn.file);
       if (local.length > 0) targets = local;
 
-      const tos: { toId: string; external: boolean }[] =
+      const inRepo = targets.filter((t) => t.id !== fn.id);
+      // Ambiguous = more than one in-repo candidate for the name → each link
+      // is a heuristic guess, so mark them low confidence.
+      const ambiguous = inRepo.length > 1;
+      const tos: { toId: string; external: boolean; confidence: Confidence }[] =
         targets.length > 0
-          ? targets.filter((t) => t.id !== fn.id).map((t) => ({ toId: t.id, external: false }))
+          ? inRepo.map((t) => ({
+              toId: t.id,
+              external: false,
+              confidence: ambiguous ? "low" : "high",
+            }))
           : EXTERNAL_NOISE.has(callee)
             ? []
-            : [{ toId: `ext:${callee}`, external: true }];
+            : [{ toId: `ext:${callee}`, external: true, confidence: "external" }];
 
-      for (const { toId, external } of tos) {
+      for (const { toId, external, confidence } of tos) {
         const key = `${fn.id} -> ${toId}`;
         if (edges.has(key)) continue;
-        const edge: Edge = { fromId: fn.id, toId, toName: callee, external };
+        const edge: Edge = { fromId: fn.id, toId, toName: callee, external, confidence };
         edges.set(key, edge);
         const arr = callersOf.get(toId);
         if (arr) arr.push(edge);
@@ -205,6 +224,17 @@ export function changedTargets(diff: GraphDiff): Map<string, string> {
   return changed;
 }
 
+/** True if any edge along the path was a low-confidence (heuristic) link. */
+export function pathHasLowConfidence(graph: Graph, path: string[]): boolean {
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i];
+    const b = path[i + 1];
+    const edge = graph.edges.get(`${a} -> ${b}`) ?? graph.edges.get(`${b} -> ${a}`);
+    if (edge?.confidence === "low") return true;
+  }
+  return false;
+}
+
 /** Resolve a fn query: bare name, `Class.method`, full id, or `file#name` suffix. */
 export function findFn(graph: Graph, name: string): FnInfo[] {
   const hits: FnInfo[] = [];
@@ -226,8 +256,8 @@ export function diffJson(diff: GraphDiff, baseLabel: string, headLabel: string) 
     removed: diff.removed.map(slim),
     modified: diff.modified.map((m) => slim(m.after)),
     renamed: diff.renamed.map((r) => ({ from: slim(r.before), to: slim(r.after) })),
-    addedEdges: diff.addedEdges.map((e) => ({ from: e.fromId, to: e.toId })),
-    removedEdges: diff.removedEdges.map((e) => ({ from: e.fromId, to: e.toId })),
+    addedEdges: diff.addedEdges.map((e) => ({ from: e.fromId, to: e.toId, confidence: e.confidence })),
+    removedEdges: diff.removedEdges.map((e) => ({ from: e.fromId, to: e.toId, confidence: e.confidence })),
   };
 }
 

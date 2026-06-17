@@ -23,6 +23,7 @@ export interface HtmlEdge {
   from: string;
   to: string;
   kind: "added" | "removed" | "unchanged";
+  uncertain: boolean;
 }
 
 export interface HtmlModel {
@@ -95,14 +96,14 @@ export function buildHtmlModel(
     const key = `${e.fromId} -> ${e.toId}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    edges.push({ from: e.fromId, to: e.toId, kind: addedKeys.has(key) ? "added" : "unchanged" });
+    edges.push({ from: e.fromId, to: e.toId, kind: addedKeys.has(key) ? "added" : "unchanged", uncertain: e.confidence === "low" });
   }
   for (const e of diff.removedEdges) {
     if (e.external || !ids.has(e.fromId) || !ids.has(e.toId)) continue;
     const key = `${e.fromId} -> ${e.toId}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    edges.push({ from: e.fromId, to: e.toId, kind: "removed" });
+    edges.push({ from: e.fromId, to: e.toId, kind: "removed", uncertain: e.confidence === "low" });
   }
 
   void shortName;
@@ -169,6 +170,7 @@ const HTML_TEMPLATE = `<!doctype html>
   line.edge { stroke: var(--context); stroke-opacity: 0.5; }
   line.edge.added { stroke: var(--added); stroke-opacity: 0.9; }
   line.edge.removed { stroke: var(--removed); stroke-opacity: 0.8; stroke-dasharray: 4 3; }
+  line.edge.uncertain { stroke-dasharray: 2 4; stroke-opacity: 0.35; }
 </style>
 </head>
 <body>
@@ -234,7 +236,7 @@ const HTML_TEMPLATE = `<!doctype html>
 
   links.forEach(function (e) {
     var s = byId[e.from], t = byId[e.to];
-    var ln = el("line", { x1: s.x, y1: s.y, x2: t.x, y2: t.y, class: "edge " + e.kind });
+    var ln = el("line", { x1: s.x, y1: s.y, x2: t.x, y2: t.y, class: "edge " + e.kind + (e.uncertain ? " uncertain" : "") });
     svg.appendChild(ln);
   });
   var selected = null;

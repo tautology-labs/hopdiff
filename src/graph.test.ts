@@ -87,6 +87,28 @@ test("two identical helpers renamed at once stay add/remove (ambiguous)", () => 
   assert.equal(d.removed.length, 2);
 });
 
+test("edge confidence: unique resolution is high, ambiguous is low, external tagged", () => {
+  const g = buildGraph([
+    file("a.ts", `function caller() { unique(); shared(); ext(); }\nfunction unique() {}`),
+    file("b.ts", `function shared() {}`),
+    file("c.ts", `function shared() {}`),
+  ]);
+  assert.equal(g.edges.get("a.ts#caller -> a.ts#unique")?.confidence, "high");
+  // `shared` has two definitions → both links are heuristic guesses
+  assert.equal(g.edges.get("a.ts#caller -> b.ts#shared")?.confidence, "low");
+  assert.equal(g.edges.get("a.ts#caller -> c.ts#shared")?.confidence, "low");
+  assert.equal(g.edges.get("a.ts#caller -> ext:ext")?.confidence, "external");
+});
+
+test("same-file unique resolution stays high even when name exists elsewhere", () => {
+  const g = buildGraph([
+    file("a.ts", `function go() { help(); }\nfunction help() {}`),
+    file("b.ts", `function help() {}`),
+  ]);
+  // same-file preference resolves to exactly one → high
+  assert.equal(g.edges.get("a.ts#go -> a.ts#help")?.confidence, "high");
+});
+
 test("trivial stub bodies never count as renames", () => {
   const base = buildGraph([file("a.ts", `function gone() {}`)]);
   const head = buildGraph([file("a.ts", `function fresh() {}`)]);
