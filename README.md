@@ -33,6 +33,18 @@ src/payments.ts
 
 One glance tells you the review story: there's a new entry point, `processRefund` gained a risk check, audit logging, and a retry wrapper, lost the legacy fraud heuristic, and is now reachable from a background job. That's the part of review you previously reconstructed in your head, one file at a time.
 
+## Quickstart
+
+```sh
+git clone https://github.com/tautology-labs/flowdiff && cd flowdiff
+npm install && npm run build && npm link    # puts `flowdiff` on your PATH
+
+cd ~/your-project        # any git repo: TS, JS, Java, Python, Go, or Rust
+flowdiff                 # call-graph diff of HEAD vs your working tree
+```
+
+That bare `flowdiff` is the one to remember: run it right after an AI agent edits your code, before you commit, to see *what the change did to your call flow* — not just which lines moved. From there, `flowdiff -i` to explore interactively, `flowdiff --html > review.html` for a shareable graph, or wire it into your agent over MCP (below).
+
 ## Usage
 
 ```sh
@@ -66,11 +78,7 @@ Run it from anywhere inside a git repo. `+` added, `−` removed, `~` body chang
 
 ## Install
 
-```sh
-npm install && npm run build && npm link
-```
-
-Node ≥ 18. Two runtime dependencies, both pure JS, both parsers — no native modules. Adding a language means writing one extractor file answering "what's a function, what does it call"; everything else — graph, diff, rename detection, TUI, MCP tools — is language-agnostic.
+Node ≥ 18, `git clone … && npm install && npm run build && npm link` (see Quickstart). Two runtime dependencies, both pure JS, both parsers — no native modules. Adding a language means writing one extractor file answering "what's a function, what does it call"; everything else — graph, diff, rename detection, TUI, MCP tools — is language-agnostic.
 
 ## Languages
 
