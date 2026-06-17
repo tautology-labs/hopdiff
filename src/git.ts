@@ -23,7 +23,7 @@ export function resolveRef(ref: string, cwd: string): string {
   return git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], cwd).trim();
 }
 
-const SOURCE_RE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|java|py|ipynb)$/;
+const SOURCE_RE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|java|py|ipynb|go)$/;
 const SKIP_RE =
   /(^|\/)(node_modules|dist|build|out|coverage|\.next|vendor|cdk\.out|\.serverless|__generated__|target|\.gradle|generated-sources|__pycache__|\.venv|venv|\.tox|site-packages|\.eggs|\.ipynb_checkpoints)(\/|$)|\.d\.ts$|\.min\.js$/;
 

@@ -36,7 +36,7 @@ Flags:
   --json    machine-readable output (for scripts, or for feeding an AI)
   --help    this text
 
-Languages: TypeScript, JavaScript, Java, Python.
+Languages: TypeScript, JavaScript, Java, Python, Go.
 MCP server (callers/callees/flow_diff/blast_radius tools for AI agents):
   claude mcp add flowdiff -- node <path-to-flowdiff>/dist/mcp.js
 `;
