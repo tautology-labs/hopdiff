@@ -1,6 +1,6 @@
 # hopdiff design — from observed hops to intended hops
 
-*2026-07-05. Companion to the essay "Hop Engineering" (link forthcoming). hopdiff today
+*2026-07-05. Companion to the essay ["Hop Engineering"](https://medium.com/@emeline.liu/hop-engineering-30810c8615e3). hopdiff today
 is the observation half of the system described here; this document is the design record
 for the rest.*
 
