@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * A/B harness: does call-graph traversal (the flowdiff MCP tools) change how
+ * A/B harness: does call-graph traversal (the hopdiff MCP tools) change how
  * well an agent fixes bugs whose cause is several hops from the symptom?
  *
  * For each task and condition: copy the fixture repo to a temp dir, git init,
- * run headless `claude -p` on the bug report (the flowdiff condition gets the
+ * run headless `claude -p` on the bug report (the hopdiff condition gets the
  * MCP server and one steering sentence), then copy in the held-out tests the
  * agent never saw and grade with `node --test`. Agents generate, scripts grade.
  *
- * Usage: node bench/run.mjs [--task <name>] [--cond control|flowdiff|both]
+ * Usage: node bench/run.mjs [--task <name>] [--cond control|hopdiff|both]
  *                           [--timeout <seconds per agent run>]
  */
 import { execSync, spawnSync } from "node:child_process";
@@ -37,12 +37,12 @@ const opt = (name, dflt) => {
 };
 const onlyTask = opt("task", null);
 const condArg = opt("cond", "both");
-const conditions = condArg === "both" ? ["control", "flowdiff"] : [condArg];
+const conditions = condArg === "both" ? ["control", "hopdiff"] : [condArg];
 const timeoutMs = Number(opt("timeout", "600")) * 1000;
 const seeds = Number(opt("seeds", "1"));
 
 const STEER =
-  "\n\nYou have flowdiff MCP tools (find_functions, function_info, flow_diff, function_diff) that serve this repo's call graph; prefer them over reading whole files when following code paths.";
+  "\n\nYou have hopdiff MCP tools (find_functions, function_info, flow_diff, function_diff) that serve this repo's call graph; prefer them over reading whole files when following code paths.";
 
 const taskNames = readdirSync(join(benchDir, "tasks")).filter(
   (n) => !n.startsWith("."),
@@ -111,20 +111,20 @@ for (const taskName of taskNames) {
 
     const cliArgs = [
       "-p",
-      cond === "flowdiff" ? prompt + STEER : prompt,
+      cond === "hopdiff" ? prompt + STEER : prompt,
       "--output-format",
       "stream-json",
       "--verbose",
       "--dangerously-skip-permissions",
       "--strict-mcp-config",
     ];
-    if (cond === "flowdiff") {
+    if (cond === "hopdiff") {
       const cfg = join(work, "mcp.bench.json");
       writeFileSync(
         cfg,
         JSON.stringify({
           mcpServers: {
-            flowdiff: { type: "stdio", command: "node", args: [mcpServer] },
+            hopdiff: { type: "stdio", command: "node", args: [mcpServer] },
           },
         }),
       );
@@ -160,8 +160,8 @@ for (const taskName of taskNames) {
         }
       }
     }
-    const flowdiffCalls = Object.entries(toolUse)
-      .filter(([n]) => n.includes("flowdiff"))
+    const hopdiffCalls = Object.entries(toolUse)
+      .filter(([n]) => n.includes("hopdiff"))
       .reduce((s, [, c]) => s + c, 0);
 
     const transcriptPath = join(
@@ -197,15 +197,15 @@ for (const taskName of taskNames) {
       turns: meta.num_turns ?? null,
       wall_s: Math.round((Date.now() - t0) / 1000),
       tool_use: toolUse,
-      flowdiff_calls: flowdiffCalls,
+      hopdiff_calls: hopdiffCalls,
       read_calls: (toolUse.Read ?? 0) + (toolUse.Grep ?? 0) + (toolUse.Glob ?? 0),
       agent_said: (meta.result ?? "").slice(0, 800),
       transcript: transcriptPath,
       workdir: proj,
     });
     const toolNote =
-      cond === "flowdiff"
-        ? ` · flowdiff×${flowdiffCalls} read×${(toolUse.Read ?? 0) + (toolUse.Grep ?? 0) + (toolUse.Glob ?? 0)}`
+      cond === "hopdiff"
+        ? ` · hopdiff×${hopdiffCalls} read×${(toolUse.Read ?? 0) + (toolUse.Grep ?? 0) + (toolUse.Glob ?? 0)}`
         : ` · read×${(toolUse.Read ?? 0) + (toolUse.Grep ?? 0) + (toolUse.Glob ?? 0)}`;
     console.error(
       `  ${pass ? "PASS" : "FAIL"} · $${meta.total_cost_usd?.toFixed?.(2) ?? "?"} · ${meta.num_turns ?? "?"} turns · ${Math.round((Date.now() - t0) / 1000)}s${toolNote}`,
@@ -235,14 +235,14 @@ if (seeds > 1) {
     cell.passes += r.pass ? 1 : 0;
     cell.cost += r.cost_usd ?? 0;
     cell.turns += r.turns ?? 0;
-    cell.fd += r.flowdiff_calls ?? 0;
+    cell.fd += r.hopdiff_calls ?? 0;
     cell.rd += r.read_calls ?? 0;
     cells.set(key, cell);
   }
   console.log("\nsummary:");
   for (const [key, c] of cells) {
     console.log(
-      `  ${key}: ${c.passes}/${c.n} pass · avg $${(c.cost / c.n).toFixed(2)} · avg ${(c.turns / c.n).toFixed(1)} turns · avg flowdiff×${(c.fd / c.n).toFixed(1)} read×${(c.rd / c.n).toFixed(1)}`,
+      `  ${key}: ${c.passes}/${c.n} pass · avg $${(c.cost / c.n).toFixed(2)} · avg ${(c.turns / c.n).toFixed(1)} turns · avg hopdiff×${(c.fd / c.n).toFixed(1)} read×${(c.rd / c.n).toFixed(1)}`,
     );
   }
 }

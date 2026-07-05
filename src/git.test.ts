@@ -15,7 +15,7 @@ function git(args: string[], cwd: string): void {
 }
 
 test("readFilesAt batch-reads files at a commit and on the worktree", (t) => {
-  const repo = mkdtempSync(join(tmpdir(), "flowdiff-git-"));
+  const repo = mkdtempSync(join(tmpdir(), "hopdiff-git-"));
   t.after(() => rmSync(repo, { recursive: true, force: true }));
 
   // Multibyte content makes the byte-size header differ from the

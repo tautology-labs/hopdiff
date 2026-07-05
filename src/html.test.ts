@@ -55,7 +55,7 @@ test("renderHtml emits one self-contained file with no external resources", () =
   assert.match(doc, /^<!doctype html>/);
   assert.ok(!/src=["']http/.test(doc), "no external scripts");
   assert.ok(!/href=["']http/.test(doc), "no external stylesheets");
-  assert.ok(doc.includes("window.__FLOWDIFF__"));
+  assert.ok(doc.includes("window.__HOPDIFF__"));
 });
 
 test("embedded data is escaped so source code cannot break out of the script tag", () => {
@@ -65,7 +65,7 @@ test("embedded data is escaped so source code cannot break out of the script tag
   ]);
   const doc = renderHtml(diffGraphs(base, head), base, head, "HEAD", "worktree");
   // The literal closing tag must not appear inside the data assignment.
-  const dataLine = doc.split("\n").find((l) => l.includes("window.__FLOWDIFF__"))!;
+  const dataLine = doc.split("\n").find((l) => l.includes("window.__HOPDIFF__"))!;
   assert.ok(!dataLine.includes("</script>"), "no raw </script> in embedded data");
   assert.ok(dataLine.includes("\\u003c/script>"), "< is unicode-escaped");
 });

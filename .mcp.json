@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "flowdiff": {
+    "hopdiff": {
       "type": "stdio",
       "command": "node",
       "args": ["${CLAUDE_PROJECT_DIR}/dist/mcp.js"]

@@ -177,7 +177,7 @@ export function renderDiff(
   const ch = groupEdges(diff);
 
   out.push("");
-  out.push(`${bold("flowdiff")} ${baseLabel} ${dim("→")} ${headLabel}`);
+  out.push(`${bold("hopdiff")} ${baseLabel} ${dim("→")} ${headLabel}`);
   out.push("");
   out.push(
     `${INDENT}${dim("functions")}   ${green(`+${diff.added.length}`)}  ${red(`−${diff.removed.length}`)}  ${yellow(`~${diff.modified.length}`)}  ${cyan(`→${diff.renamed.length}`)}` +
@@ -230,7 +230,7 @@ export function renderDiff(
     out.push("");
   }
 
-  out.push(dim(`${INDENT}flowdiff fn <name> shows a function's full diff`));
+  out.push(dim(`${INDENT}hopdiff fn <name> shows a function's full diff`));
   out.push("");
   return out.join("\n");
 }

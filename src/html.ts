@@ -132,7 +132,7 @@ export function renderHtml(
   const model = buildHtmlModel(diff, baseGraph, headGraph, baseLabel, headLabel);
   // Neutralize "</script>" and any "<" so the JSON can't break out of the tag.
   const data = JSON.stringify(model).replace(/</g, "\\u003c");
-  return HTML_TEMPLATE.replace("/*__DATA__*/", `window.__FLOWDIFF__ = ${data};`);
+  return HTML_TEMPLATE.replace("/*__DATA__*/", `window.__HOPDIFF__ = ${data};`);
 }
 
 const HTML_TEMPLATE = `<!doctype html>
@@ -140,7 +140,7 @@ const HTML_TEMPLATE = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>flowdiff</title>
+<title>hopdiff</title>
 <style>
   :root {
     --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #e6edf3;
@@ -175,7 +175,7 @@ const HTML_TEMPLATE = `<!doctype html>
 </head>
 <body>
 <header>
-  <b>flowdiff</b>
+  <b>hopdiff</b>
   <span class="muted" id="range"></span>
   <span class="legend">
     <span><i class="dot" style="background:var(--added)"></i>added</span>
@@ -192,7 +192,7 @@ const HTML_TEMPLATE = `<!doctype html>
 <script>
 /*__DATA__*/
 (function () {
-  var D = window.__FLOWDIFF__;
+  var D = window.__HOPDIFF__;
   var COLOR = { added: "#3fb950", removed: "#f85149", modified: "#d29922", renamed: "#58a6ff", context: "#6e7681" };
   document.getElementById("range").textContent = D.base + " \\u2192 " + D.head +
     "   ( +" + D.counts.added + "  \\u2212" + D.counts.removed + "  ~" + D.counts.modified + "  \\u2192" + D.counts.renamed + " )";

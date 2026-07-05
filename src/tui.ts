@@ -105,7 +105,7 @@ export function runTui(opts: TuiOptions): void {
     const lines: string[] = [];
     const headerAt: number[] = [];
     lines.push(
-      `${bold("flowdiff")} ${opts.baseLabel} ${dim("→")} ${opts.headLabel}   ` +
+      `${bold("hopdiff")} ${opts.baseLabel} ${dim("→")} ${opts.headLabel}   ` +
         `${green(`+${diff.added.length}`)} ${red(`−${diff.removed.length}`)} ${yellow(`~${diff.modified.length}`)} ${cyan(`→${diff.renamed.length}`)}   ` +
         `${dim("? for help")}`,
     );

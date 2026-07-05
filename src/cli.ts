@@ -16,19 +16,19 @@ import { renderHtml } from "./html.js";
 import { runTui } from "./tui.js";
 import { discoverRoots } from "./roots.js";
 
-const HELP = `flowdiff — call-graph diffs for code review
+const HELP = `hopdiff — call-graph diffs for code review
 
 Usage:
-  flowdiff                     HEAD vs working tree
-  flowdiff <base>              <base> vs working tree
-  flowdiff <base> <head>       compare two revisions
-  flowdiff <base>..<head>      same, range syntax
-  flowdiff fn <name> [revs]    show one function's before/after diff
-  flowdiff blast <name> [revs] incident mode: which changed functions can
+  hopdiff                     HEAD vs working tree
+  hopdiff <base>              <base> vs working tree
+  hopdiff <base> <head>       compare two revisions
+  hopdiff <base>..<head>      same, range syntax
+  hopdiff fn <name> [revs]    show one function's before/after diff
+  hopdiff blast <name> [revs] incident mode: which changed functions can
                                touch <name>? (symptom fn + deploy range)
-  flowdiff roots               list this repo's locally-linked sibling services
-  flowdiff completions zsh     print shell completions (add to ~/.zshrc:
-                               eval "$(flowdiff completions zsh)")
+  hopdiff roots               list this repo's locally-linked sibling services
+  hopdiff completions zsh     print shell completions (add to ~/.zshrc:
+                               eval "$(hopdiff completions zsh)")
 
 Flags:
   -i         interactive mode — navigate the graph, expand diffs, e to edit
@@ -39,21 +39,21 @@ Flags:
 
 Languages: TypeScript, JavaScript, Java, Python, Go, Rust.
 MCP server (callers/callees/flow_diff/blast_radius tools for AI agents):
-  claude mcp add flowdiff -- node <path-to-flowdiff>/dist/mcp.js
+  claude mcp add hopdiff -- node <path-to-hopdiff>/dist/mcp.js
 `;
 
-const ZSH_COMPLETIONS = `#compdef flowdiff
-__flowdiff_refs() {
+const ZSH_COMPLETIONS = `#compdef hopdiff
+__hopdiff_refs() {
   local -a refs
   refs=(HEAD \${(f)"$(git for-each-ref --format='%(refname:short)' refs/heads refs/tags 2>/dev/null)"})
   compadd -a refs
 }
-__flowdiff_fns() {
+__hopdiff_fns() {
   local -a fns
-  fns=(\${(f)"$(flowdiff --list-fns 2>/dev/null)"})
+  fns=(\${(f)"$(hopdiff --list-fns 2>/dev/null)"})
   compadd -a fns
 }
-_flowdiff() {
+_hopdiff() {
   local curcontext="$curcontext" state line
   _arguments -C \\
     '(-i --interactive)'{-i,--interactive}'[interactive TUI]' \\
@@ -65,21 +65,21 @@ _flowdiff() {
     first)
       local -a cmds
       cmds=('fn:diff one function' 'blast:incident mode — changed functions that can touch a symptom' 'roots:list linked sibling services' 'completions:print shell completions')
-      _describe -t commands 'flowdiff command' cmds
-      __flowdiff_refs
+      _describe -t commands 'hopdiff command' cmds
+      __hopdiff_refs
       ;;
     rest)
       if [[ (\${words[2]} == fn || \${words[2]} == blast) && CURRENT -eq 3 ]]; then
-        __flowdiff_fns
+        __hopdiff_fns
       elif [[ \${words[2]} == completions ]]; then
         compadd zsh
       else
-        __flowdiff_refs
+        __hopdiff_refs
       fi
       ;;
   esac
 }
-compdef _flowdiff flowdiff
+compdef _hopdiff hopdiff
 `;
 
 function loadGraph(ref: string, cwd: string, includeTests = true): Graph {
@@ -118,7 +118,7 @@ function main(): void {
 
   if (args[0] === "completions") {
     if (args[1] && args[1] !== "zsh") {
-      process.stderr.write("flowdiff: only zsh completions exist so far\n");
+      process.stderr.write("hopdiff: only zsh completions exist so far\n");
       process.exit(1);
     }
     process.stdout.write(ZSH_COMPLETIONS);
@@ -129,11 +129,11 @@ function main(): void {
   try {
     cwd = repoRoot(process.cwd());
   } catch {
-    process.stderr.write("flowdiff: not inside a git repository\n");
+    process.stderr.write("hopdiff: not inside a git repository\n");
     process.exit(1);
   }
 
-  // Hidden: feeds `flowdiff fn <TAB>` — unique function names in the worktree.
+  // Hidden: feeds `hopdiff fn <TAB>` — unique function names in the worktree.
   if (argv.includes("--list-fns")) {
     const graph = loadGraph(WORKTREE, cwd);
     const names = new Set<string>();
@@ -154,7 +154,7 @@ function main(): void {
     } else {
       for (const r of roots) process.stdout.write(`${r.name}\t${r.dir}\n`);
       process.stdout.write(
-        `\n${roots.length} roots — the flowdiff MCP traverses calls across all of them.\n`,
+        `\n${roots.length} roots — the hopdiff MCP traverses calls across all of them.\n`,
       );
     }
     return;
@@ -164,7 +164,7 @@ function main(): void {
   const blastMode = args[0] === "blast";
   const fnName = fnMode || blastMode ? args[1] : null;
   if ((fnMode || blastMode) && !fnName) {
-    process.stderr.write(`flowdiff: ${args[0]} requires a function name\n`);
+    process.stderr.write(`hopdiff: ${args[0]} requires a function name\n`);
     process.exit(1);
   }
   const { base, head } = parseRevs(fnMode || blastMode ? args.slice(2) : args);
@@ -175,7 +175,7 @@ function main(): void {
     baseRef = resolveRef(base, cwd);
     headRef = resolveRef(head, cwd);
   } catch {
-    process.stderr.write(`flowdiff: cannot resolve revision ${base} or ${head}\n`);
+    process.stderr.write(`hopdiff: cannot resolve revision ${base} or ${head}\n`);
     process.exit(1);
   }
 
@@ -185,7 +185,7 @@ function main(): void {
   if (blastMode && fnName) {
     const hits = findFn(headGraph, fnName);
     if (hits.length === 0) {
-      process.stderr.write(`flowdiff: no function named "${fnName}" at ${label(head)}\n`);
+      process.stderr.write(`hopdiff: no function named "${fnName}" at ${label(head)}\n`);
       const near = [...headGraph.fns.values()]
         .filter((f) => f.name.toLowerCase().includes(fnName.toLowerCase()))
         .slice(0, 8);
@@ -196,7 +196,7 @@ function main(): void {
       process.exit(1);
     }
     if (hits.length > 1) {
-      process.stderr.write(`flowdiff: "${fnName}" is ambiguous — pick one:\n`);
+      process.stderr.write(`hopdiff: "${fnName}" is ambiguous — pick one:\n`);
       for (const h of hits) process.stderr.write(`  ${h.id}\n`);
       process.exit(1);
     }
@@ -223,16 +223,16 @@ function main(): void {
     const befores = findFn(baseGraph, fnName);
     const afters = findFn(headGraph, fnName);
     if (befores.length === 0 && afters.length === 0) {
-      process.stderr.write(`flowdiff: no function named "${fnName}" at either revision\n`);
+      process.stderr.write(`hopdiff: no function named "${fnName}" at either revision\n`);
       process.exit(1);
     }
     if (befores.length > 1 || afters.length > 1) {
       const ids = new Set([...befores, ...afters].map((f) => f.id));
       if (ids.size > 1) {
-        process.stderr.write(`flowdiff: "${fnName}" is ambiguous — pick one:\n`);
+        process.stderr.write(`hopdiff: "${fnName}" is ambiguous — pick one:\n`);
         for (const id of [...ids].sort()) process.stderr.write(`  ${id}\n`);
         process.stderr.write(
-          `any unique suffix works, e.g. flowdiff fn "${[...ids][0].split("/").pop()}"\n`,
+          `any unique suffix works, e.g. hopdiff fn "${[...ids][0].split("/").pop()}"\n`,
         );
         process.exit(1);
       }
@@ -243,7 +243,7 @@ function main(): void {
 
   if (interactive) {
     if (!process.stdout.isTTY || !process.stdin.isTTY) {
-      process.stderr.write("flowdiff: -i needs an interactive terminal\n");
+      process.stderr.write("hopdiff: -i needs an interactive terminal\n");
       process.exit(1);
     }
     runTui({
@@ -271,9 +271,9 @@ function main(): void {
     const doc = renderHtml(diff, baseGraph, headGraph, label(base), label(head));
     if (process.stdout.isTTY) {
       // Piping HTML to a terminal is useless — write a file and point at it.
-      const out = join(cwd, "flowdiff-review.html");
+      const out = join(cwd, "hopdiff-review.html");
       writeFileSync(out, doc);
-      process.stderr.write(`flowdiff: wrote ${out}\n`);
+      process.stderr.write(`hopdiff: wrote ${out}\n`);
     } else {
       process.stdout.write(doc);
     }

@@ -1,11 +1,11 @@
-# flowdiff
+# hopdiff
 
-**Call-graph diffs for code review.** Line diffs answer "what characters changed." Review is actually the question "what *behavior* changed." flowdiff shows the structural delta of a change — which functions appeared, disappeared, or changed, and how the call flow was rewired — right in your terminal.
+**Call-graph diffs for code review.** Line diffs answer "what characters changed." Review is actually the question "what *behavior* changed." hopdiff shows the structural delta of a change — which functions appeared, disappeared, or changed, and how the call flow was rewired — right in your terminal.
 
-This matters more than ever now that much of the code in a diff was written by an AI agent. Whoever operated the agent still has to comprehend and approve the result, and a flat list of line diffs in alphabetical file order is the wrong tool for that. Existing code-graph tools (code-review-graph, Greptile, etc.) build exactly this graph — and then feed it to the AI as context. flowdiff renders it for the human.
+This matters more than ever now that much of the code in a diff was written by an AI agent. Whoever operated the agent still has to comprehend and approve the result, and a flat list of line diffs in alphabetical file order is the wrong tool for that. Existing code-graph tools (code-review-graph, Greptile, etc.) build exactly this graph — and then feed it to the AI as context. hopdiff renders it for the human.
 
 ```
-flowdiff HEAD → worktree
+hopdiff HEAD → worktree
 
   functions   +4  −1  ~2  →0      call edges  +6  −1
   + added   − removed   ~ body changed   → renamed/moved
@@ -36,38 +36,38 @@ One glance tells you the review story: there's a new entry point, `processRefund
 ## Quickstart
 
 ```sh
-git clone https://github.com/tautology-labs/flowdiff && cd flowdiff
-npm install && npm run build && npm link    # puts `flowdiff` on your PATH
+git clone https://github.com/tautology-labs/hopdiff && cd hopdiff
+npm install && npm run build && npm link    # puts `hopdiff` on your PATH
 
 cd ~/your-project        # any git repo: TS, JS, Java, Python, Go, or Rust
-flowdiff                 # call-graph diff of HEAD vs your working tree
+hopdiff                 # call-graph diff of HEAD vs your working tree
 ```
 
-That bare `flowdiff` is the one to remember: run it right after an AI agent edits your code, before you commit, to see *what the change did to your call flow* — not just which lines moved. From there, `flowdiff -i` to explore interactively, `flowdiff --html > review.html` for a shareable graph, or wire it into your agent over MCP (below).
+That bare `hopdiff` is the one to remember: run it right after an AI agent edits your code, before you commit, to see *what the change did to your call flow* — not just which lines moved. From there, `hopdiff -i` to explore interactively, `hopdiff --html > review.html` for a shareable graph, or wire it into your agent over MCP (below).
 
 ## Usage
 
 ```sh
-flowdiff                    # HEAD vs working tree — run it right after your agent edits
-flowdiff main               # main vs working tree
-flowdiff main..feature      # any two revisions
-flowdiff fn processRefund   # before/after diff of one function
-flowdiff blast handleRefund v1.42.0 v1.43.0
+hopdiff                    # HEAD vs working tree — run it right after your agent edits
+hopdiff main               # main vs working tree
+hopdiff main..feature      # any two revisions
+hopdiff fn processRefund   # before/after diff of one function
+hopdiff blast handleRefund v1.42.0 v1.43.0
                             # incident mode: which changed functions can touch
                             # the symptom? call paths included
-flowdiff -i                 # interactive: navigate the graph, → browses callers,
+hopdiff -i                 # interactive: navigate the graph, → browses callers,
                             # enter expands diffs, e opens $EDITOR
-flowdiff --html > review.html   # self-contained interactive graph (no CDN, opens
+hopdiff --html > review.html   # self-contained interactive graph (no CDN, opens
                             # offline, attach to a PR); bare --html writes a file
-flowdiff roots              # locally-linked sibling services in the graph
-flowdiff --no-tests         # exclude test files (by language convention)
-flowdiff --json             # structured output — scripts, or context for an AI reviewer
+hopdiff roots              # locally-linked sibling services in the graph
+hopdiff --no-tests         # exclude test files (by language convention)
+hopdiff --json             # structured output — scripts, or context for an AI reviewer
 ```
 
 Tab completion (subcommands, git refs, and live function names from the parsed graph) — add to `~/.zshrc`:
 
 ```sh
-eval "$(flowdiff completions zsh)"
+eval "$(hopdiff completions zsh)"
 ```
 
 Unknown function names get did-you-mean suggestions; ambiguous ones (Java overloads, duplicates) list candidate `file#name` ids to pick from.
@@ -99,14 +99,14 @@ The same graph, served as tools. Frontier models lose the thread following logic
 
 ```sh
 # Claude Code
-claude mcp add flowdiff -- node /absolute/path/to/flowdiff/dist/mcp.js
+claude mcp add hopdiff -- node /absolute/path/to/hopdiff/dist/mcp.js
 ```
 
 ```toml
 # Codex (~/.codex/config.toml — key names may shift across versions, check their docs)
-[mcp_servers.flowdiff]
+[mcp_servers.hopdiff]
 command = "node"
-args = ["/absolute/path/to/flowdiff/dist/mcp.js"]
+args = ["/absolute/path/to/hopdiff/dist/mcp.js"]
 ```
 
 MCP is an open protocol, so any MCP client works the same way — Cursor, Windsurf, your own agent: point it at `node dist/mcp.js` over stdio. The server reads the repo it's launched in (or `CLAUDE_PROJECT_DIR` when set).
@@ -122,7 +122,7 @@ MCP is an open protocol, so any MCP client works the same way — Cursor, Windsu
 
 ### Across services
 
-The working-tree graph spans **locally-linked sibling services**, not just one repo. When you have several services checked out side by side and linked (a `file:`/`workspace:` dependency, or an `npm link` / `file:` install that leaves a symlink in `node_modules`), `function_info` resolves callers and callees *across* the service boundary. So before you change a shared contract, one `function_info` on it lists every consumer in every linked service — the case where reading files one at a time loses track and updates 3 of 5 callers. Run `flowdiff roots` to see what's stitched together. Registry dependencies are never followed, so this doesn't drag in `node_modules`.
+The working-tree graph spans **locally-linked sibling services**, not just one repo. When you have several services checked out side by side and linked (a `file:`/`workspace:` dependency, or an `npm link` / `file:` install that leaves a symlink in `node_modules`), `function_info` resolves callers and callees *across* the service boundary. So before you change a shared contract, one `function_info` on it lists every consumer in every linked service — the case where reading files one at a time loses track and updates 3 of 5 callers. Run `hopdiff roots` to see what's stitched together. Registry dependencies are never followed, so this doesn't drag in `node_modules`.
 
 ```sh
 npm test   # 20 unit tests, node:test, no test framework
@@ -130,10 +130,10 @@ npm test   # 20 unit tests, node:test, no test framework
 
 ## Every edge tells you how it's known
 
-Call resolution is name-based, so some links are certain and some are guesses — and flowdiff says which. Every edge carries a `confidence`:
+Call resolution is name-based, so some links are certain and some are guesses — and hopdiff says which. Every edge carries a `confidence`:
 
 - **high** — the call resolved to exactly one definition
-- **low** — the name had multiple candidates; flowdiff linked heuristically (a guess to verify)
+- **low** — the name had multiple candidates; hopdiff linked heuristically (a guess to verify)
 - **external** — the callee isn't defined in this repo
 
 It's a *property of every edge*, not a separate query — provenance travels with the data so you can never receive a link without knowing how much to trust it. `--json` and the MCP tools include it on every edge always; the terminal marks only low-confidence links with a dim `?` (annotate the exception, not the rule); `--html` draws them faintly dashed; and `blast` flags any path that *depends on* an uncertain edge — because you shouldn't pin an incident mitigation to a guess. The field is forward-compatible: type-checker-`proven` and model-`predicted` tiers slot in without reshaping anything.

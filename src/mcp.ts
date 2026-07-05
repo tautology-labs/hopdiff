@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * flowdiff MCP server — exposes the call graph as tools over stdio, so an
+ * hopdiff MCP server — exposes the call graph as tools over stdio, so an
  * AI agent can traverse code the way the TUI user does: function by
  * function, following edges, instead of reading whole files.
  *
@@ -321,7 +321,7 @@ rl.on("line", (line) => {
       reply(id, {
         protocolVersion: params?.protocolVersion ?? "2024-11-05",
         capabilities: { tools: {} },
-        serverInfo: { name: "flowdiff", version: "0.1.0" },
+        serverInfo: { name: "hopdiff", version: "0.1.0" },
       });
     } else if (method === "tools/list") {
       reply(id, { tools: TOOLS });
