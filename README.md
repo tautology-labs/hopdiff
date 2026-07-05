@@ -150,6 +150,8 @@ Name-based call resolution is a deliberate v0 heuristic: it's wrong in the ways 
 
 ## Not yet
 
+The longer arc — declared intent, drift detection, the loop that drives code and intent to converge — is in [DESIGN.md](DESIGN.md), with a runnable sketch in [design/sketch](design/sketch).
+
 - A GitHub Action that posts the flow summary (and the `--html` artifact) as a PR comment
 - Branch-level deltas (new `if`/`switch` arms inside a changed function)
 - Rename detection for *edited* renames (exact-body renames and moves are detected; renamed-and-changed still shows as remove + add)

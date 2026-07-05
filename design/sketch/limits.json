@@ -1,0 +1,19 @@
+{
+  "sqs.fifo": {
+    "sendRate": {
+      "unbatched": { "value": 300, "unit": "msgs/sec/queue" },
+      "batched": { "value": 3000, "unit": "msgs/sec/queue" }
+    },
+    "adjustable": "hard",
+    "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html",
+    "asOf": "2026-05-01"
+  },
+  "sqs.standard": {
+    "sendRate": {
+      "unbatched": { "value": null, "unit": "nearly unlimited" }
+    },
+    "adjustable": "hard",
+    "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html",
+    "asOf": "2026-05-01"
+  }
+}
